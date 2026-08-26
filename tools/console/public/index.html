@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Motionhexa Console</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>Motionhexa Console</h1>
+    <div class="header-actions">
+      <span class="dirty-dot" id="dirtyDot" title="Unsaved changes"></span>
+      <button class="btn btn-ghost" id="reloadBtn">Reload from disk</button>
+      <button class="btn btn-primary" id="saveBtn">Save changes</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>Effects</h2>
+      <p class="hint">Checked effects are active in the on-device rotation, in this order. Unchecked ones stay compiled in but skipped. Changes here only take effect after Build/Deploy.</p>
+      <ul id="patternList" class="pattern-list"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Config</h2>
+      <p class="hint">Values tagged <code>@tunable(...)</code> in the firmware. Add the tag to any constant to expose it here.</p>
+      <div id="configList" class="config-list"></div>
+    </section>
+  </main>
+
+  <section class="deploy-bar">
+    <button class="btn btn-secondary" id="buildBtn">Build only</button>
+    <button class="btn btn-deploy" id="deployBtn">Build &amp; Deploy to device</button>
+    <span class="deploy-note">Deploy flashes the physical device over USB. Nothing runs until you click.</span>
+  </section>
+
+  <section class="panel log-panel">
+    <h2>Output</h2>
+    <pre id="logOut" class="log-out">Idle.</pre>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
