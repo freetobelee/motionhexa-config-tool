@@ -184,12 +184,27 @@
   .count-readout b { color: var(--accent-lit); font-weight: 600; }
 
   /* ---- sidebar ---- */
-  .library-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 2px; }
+  .library-list-wrap { position: relative; }
+  .library-list {
+    display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 6px;
+    scrollbar-width: thin; scrollbar-color: var(--accent-ui-dim) var(--surface-2);
+  }
+  .library-list::-webkit-scrollbar { width: 8px; }
+  .library-list::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 4px; }
+  .library-list::-webkit-scrollbar-thumb { background: var(--accent-ui-dim); border-radius: 4px; }
+  .library-list::-webkit-scrollbar-thumb:hover { background: var(--accent-ui); }
+  .library-list-wrap::after {
+    content: ""; position: absolute; left: 0; right: 6px; bottom: 0; height: 28px;
+    background: linear-gradient(to bottom, transparent, var(--surface-2));
+    pointer-events: none; border-radius: 0 0 2px 2px;
+  }
   .library-empty { color: var(--text-faint); font-size: 13px; padding: 10px 2px; line-height: 1.5; }
   .lib-item {
     display: flex; align-items: center; gap: 10px; background: var(--surface-2);
     border: 1px solid var(--border-soft); border-left: 2px solid var(--border-soft); padding: 9px 10px; border-radius: 2px;
+    cursor: pointer;
   }
+  .lib-item:hover { background: var(--surface-3); border-color: var(--text-faint); }
   .lib-item.active { border-left-color: var(--accent-lit); }
   .lib-item .lib-info { flex: 1 1 auto; min-width: 0; }
   .lib-item .lib-name { font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -197,9 +212,11 @@
   .icon-btn {
     background: transparent; border: 1px solid transparent; color: var(--text-dim);
     width: 26px; height: 26px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1;
+    flex: 0 0 auto;
   }
   .icon-btn:hover { background: var(--surface-3); color: var(--text); }
   .icon-btn.danger:hover { background: rgba(255,107,107,0.12); color: var(--danger); }
+  .icon-btn.danger.confirm { background: rgba(255,107,107,0.18); color: var(--danger); border-color: var(--danger-dim); }
 
   .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; font-size: 13px; }
   .info-grid dt { color: var(--text-faint); }
@@ -315,12 +332,11 @@
 
   <header class="top">
     <div class="brand"><span class="mark">HEXA</span><h1>Object Forge</h1></div>
-    <p>One editor for the 271-LED hex canvas: paint full-screen elements or design a 3-tier font, saved straight into <code class="k">patterns.h</code>.</p>
     <div class="header-actions">
       <nav class="nav-tabs">
         <a class="nav-tab" href="/">Programs</a>
-        <a class="nav-tab" href="/system.html">System</a>
         <a class="nav-tab active" href="/forge.html">Fonts &amp; Elements</a>
+        <a class="nav-tab" href="/system.html">System</a>
       </nav>
       <span class="dirty-dot" id="diskDirtyDot" title="Unsaved changes not yet written to patterns.h"></span>
       <span class="lib-version" id="libVersionTag" title="Bumps on every save, delete, or import.">v1</span>
@@ -342,23 +358,9 @@
   <div class="layout">
     <section class="panel" id="mainPanel">
 
-      <!-- Elements toolbar -->
-      <div class="toolbar" id="elementsToolbar">
-        <div class="field">
-          <label for="nameInput">Element name</label>
-          <input type="text" id="nameInput" placeholder="e.g. trophy, heart, arrow-up" autocomplete="off" spellcheck="false">
-        </div>
-        <button class="btn btn-primary" id="saveBtn">Save</button>
-        <button class="btn btn-ghost" id="newBtn">New / clear</button>
-        <div class="spacer"></div>
-        <span class="dirty-dot" id="elementsDirtyDot" title="Unsaved change on canvas"></span>
-        <div class="status-line" id="statusLine"></div>
-      </div>
-
       <!-- Font toolbar -->
-      <div class="toolbar" id="fontToolbar" style="display:none;">
+      <div class="toolbar" id="fontToolbar">
         <div class="field">
-          <label>Size</label>
           <div class="size-tabs">
             <button class="size-tab" data-size="xs">Small<span class="n">61</span></button>
             <button class="size-tab" data-size="md">Medium<span class="n">127</span></button>
@@ -388,8 +390,19 @@
       </div>
 
       <div class="canvas-foot">
-        <span class="hint">Click a pixel to toggle it. Drag across pixels to paint — or erase — a whole stroke.</span>
         <span class="count-readout"><b id="litCount">0</b> / <span id="activeTotal">271</span> lit</span>
+      </div>
+
+      <!-- Elements toolbar -->
+      <div class="toolbar" id="elementsToolbar" style="display:none;">
+        <div class="field">
+          <input type="text" id="nameInput" placeholder="e.g. trophy, heart, arrow-up" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="btn btn-primary" id="saveBtn">Save</button>
+        <button class="btn btn-ghost" id="newBtn">New / clear</button>
+        <div class="spacer"></div>
+        <span class="dirty-dot" id="elementsDirtyDot" title="Unsaved change on canvas"></span>
+        <div class="status-line" id="statusLine"></div>
       </div>
     </section>
 
@@ -397,7 +410,7 @@
 
       <section class="panel" id="libraryPanel">
         <div class="panel-head"><h2>Saved Elements</h2></div>
-        <div class="panel-body"><div class="library-list" id="libraryList"></div></div>
+        <div class="panel-body"><div class="library-list-wrap"><div class="library-list" id="libraryList"></div></div></div>
       </section>
 
       <section class="panel" id="fontInfoPanel" style="display:none;">
@@ -412,41 +425,15 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="tabs">
-          <button class="tab-btn active" data-tab="export">Export</button>
-          <button class="tab-btn" data-tab="import">Import</button>
-        </div>
-        <div class="tab-panel active" id="tab-export">
-          <div class="row">
-            <span class="hint">Everything saved, as pasteable C++</span>
-            <button class="btn btn-small btn-ghost" id="copyExportBtn">Copy</button>
-          </div>
-          <textarea id="exportOut" readonly spellcheck="false"></textarea>
-          <p class="note">Bitmasks, not coordinate lists: bit <code class="k">i</code> of a glyph/element's byte array is cell <code class="k">i</code> of that size's <code class="k">kHexCellQR_*</code> table (axial offset from center). Decode with <code class="k">(mask[i>>3]>>(i&7))&1</code>, then place with the same <code class="k">rotateAxialSteps</code> / <code class="k">axial.indexAtAxial</code> pattern as <code class="k">drawHexGlyphSteps</code>.</p>
-        </div>
-        <div class="tab-panel" id="tab-import">
-          <div class="row">
-            <span class="hint">Paste previously exported code</span>
-            <button class="btn btn-small btn-primary" id="parseImportBtn">Parse &amp; add</button>
-          </div>
-          <textarea id="importIn" placeholder="const uint8_t kFont_XS_A[8] PROGMEM = { 0x.. };" spellcheck="false"></textarea>
-          <p class="note" id="importStatus">Recognizes bitmask <code class="k">kFont_SIZE_CHAR[]</code> / <code class="k">kElement_NAME[]</code> arrays, and the older <code class="k">kElement_NAME[][2]</code> coordinate-list format.</p>
-        </div>
-      </section>
     </aside>
   </div>
-
-  <footer class="legend">
-    <span>Grid mirrors the physical hex: radius 9, 271 LEDs, center = (0, 0).</span>
-    <span>"Save to patterns.h" writes straight to disk — nothing here depends on browser storage anymore.</span>
-    <span>Switching character, size, or element commits what you were editing into memory; only Save writes it to disk.</span>
-  </footer>
 
   <footer class="credits">
     <span>motionhexa by starduststorm</span>
     <span class="sep">&middot;</span>
-    <a href="https://github.com/starduststorm/motionhexa" target="_blank" rel="noopener">Original project on GitHub</a>
+    <span>Web tool by Lee Willy</span>
+    <span class="sep">&middot;</span>
+    <a href="https://github.com/starduststorm/motionhexa" target="_blank" rel="noopener">GitHub</a>
     <span class="sep">&middot;</span>
     <a href="https://www.tindie.com/products/starduststorm/the-hexagon/" id="tindieLink" target="_blank" rel="noopener">Get one on Tindie</a>
   </footer>
@@ -850,7 +837,7 @@
 
   /* ---------------- state ---------------- */
 
-  var state = { mode: "elements", sizeKey: "xs", ch: "A", elementName: null };
+  var state = { mode: "font", sizeKey: "xs", ch: "A", elementName: null };
   var onCells = new Set();
 
   /* ---------------- dirty tracking ---------------- */
@@ -1159,7 +1146,6 @@
     A.markClean();
     A.saveStorage();
     renderLibrary();
-    window.__hexaForgeIO.renderExport();
     flash(statusLine, "Saved “" + name + "” (" + onCells.size + " px).", "ok");
   });
 
@@ -1175,6 +1161,9 @@
 
   var libraryListEl = document.getElementById("libraryList");
 
+  var TRASH_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" xmlns="http://www.w3.org/2000/svg" fill="currentColor">' +
+    '<path d="M6 1.5h4a.5.5 0 0 1 .5.5v1H14v1h-1v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13V4H2V3h3.5V2a.5.5 0 0 1 .5-.5zM4 4v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V4H4zm2 2h1v6H6V6zm3 0h1v6H9V6z"/></svg>';
+
   function renderLibrary() {
     var names = Object.keys(data.elements).sort(function (a, b) { return a.localeCompare(b); });
     if (names.length === 0) {
@@ -1186,6 +1175,15 @@
       var cells = data.elements[name];
       var item = document.createElement("div");
       item.className = "lib-item" + (name === state.elementName ? " active" : "");
+      item.title = "Load “" + name + "” into the canvas";
+      item.addEventListener("click", function () {
+        commitCurrent();
+        A.loadCellsIntoCanvas(cells);
+        nameInput.value = name;
+        state.elementName = name;
+        renderLibrary();
+        flash(statusLine, "Loaded “" + name + "”.");
+      });
 
       var info = document.createElement("div");
       info.className = "lib-info";
@@ -1195,20 +1193,10 @@
       ct.className = "lib-count"; ct.textContent = cells.length + " px";
       info.appendChild(nm); info.appendChild(ct);
 
-      var loadBtn = document.createElement("button");
-      loadBtn.className = "icon-btn"; loadBtn.title = "Load into canvas"; loadBtn.textContent = "↑";
-      loadBtn.addEventListener("click", function () {
-        commitCurrent();
-        A.loadCellsIntoCanvas(cells);
-        nameInput.value = name;
-        state.elementName = name;
-        renderLibrary();
-        flash(statusLine, "Loaded “" + name + "”.");
-      });
-
       var delBtn = document.createElement("button");
-      delBtn.className = "icon-btn danger"; delBtn.title = "Delete"; delBtn.textContent = "×";
-      delBtn.addEventListener("click", function () {
+      delBtn.className = "icon-btn danger"; delBtn.title = "Delete"; delBtn.innerHTML = TRASH_SVG;
+      delBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
         if (delBtn.dataset.confirm === "1") {
           A.pushUndo();
           delete data.elements[name];
@@ -1220,17 +1208,16 @@
           }
           A.saveStorage();
           renderLibrary();
-          window.__hexaForgeIO.renderExport();
           flash(statusLine, "Deleted “" + name + "”.");
         } else {
           delBtn.dataset.confirm = "1";
-          delBtn.textContent = "✓";
+          delBtn.classList.add("confirm");
           delBtn.title = "Click again to confirm delete";
-          setTimeout(function () { delBtn.dataset.confirm = "0"; delBtn.textContent = "×"; delBtn.title = "Delete"; }, 2500);
+          setTimeout(function () { delBtn.dataset.confirm = "0"; delBtn.classList.remove("confirm"); delBtn.innerHTML = TRASH_SVG; delBtn.title = "Delete"; }, 2500);
         }
       });
 
-      item.appendChild(info); item.appendChild(loadBtn); item.appendChild(delBtn);
+      item.appendChild(info); item.appendChild(delBtn);
       libraryListEl.appendChild(item);
     });
   }
@@ -1265,7 +1252,6 @@
       flash(fontStatusLine, "Undone.", "ok");
     }
     updateCharGridCustomizedMarks();
-    if (window.__hexaForgeIO) window.__hexaForgeIO.renderExport();
   }
 
   if (undoBtn) undoBtn.addEventListener("click", doUndo);
@@ -1296,266 +1282,8 @@
   var A = window.__hexaForgeApp;
   var data = A.data, SIZES = A.SIZES, SYMBOLS = A.SYMBOLS;
 
-  function sanitizeIdent(name) {
-    var s = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-    if (!s) s = "ELEMENT";
-    if (/^[0-9]/.test(s)) s = "E_" + s;
-    return s;
-  }
-  function identForChar(ch) {
-    if (/^[A-Za-z0-9]$/.test(ch)) return ch;
-    var found = SYMBOLS.find(function (s) { return s.ch === ch; });
-    return found ? found.id : "CH" + ch.charCodeAt(0);
-  }
-  function identToChar(ident) {
-    if (/^[A-Za-z0-9]$/.test(ident)) return ident;
-    var found = SYMBOLS.find(function (s) { return s.id === ident; });
-    return found ? found.ch : null;
-  }
-  function identToDisplay(ident) { return ident.toLowerCase().replace(/_/g, " "); }
-
-  function bitmaskBytes(sizeKey, cellSet) {
-    var cells = SIZES[sizeKey].cells;
-    var nBytes = Math.ceil(cells.length / 8);
-    var bytes = [];
-    for (var i = 0; i < nBytes; i++) bytes.push(0);
-    cells.forEach(function (c, i) {
-      if (cellSet.has(c.key)) bytes[i >> 3] |= (1 << (i & 7));
-    });
-    return bytes;
-  }
-  function bytesToHexList(bytes) {
-    return bytes.map(function (b) { return "0x" + b.toString(16).toUpperCase().padStart(2, "0"); }).join(", ");
-  }
-  function bytesTextToCells(bytesText, sizeKey) {
-    var byteRe = /0x([0-9A-Fa-f]{1,2})/g;
-    var bytes = [];
-    var bm;
-    while ((bm = byteRe.exec(bytesText))) bytes.push(parseInt(bm[1], 16));
-    var cells = SIZES[sizeKey].cells;
-    var result = [];
-    cells.forEach(function (c, i) {
-      if ((bytes[i >> 3] >> (i & 7)) & 1) result.push([c.q, c.r]);
-    });
-    return result;
-  }
-
-  /* ---------------- version manifest ---------------- */
-
-  function fnv1aHex(str) {
-    var h = 0x811c9dc5;
-    for (var i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-    }
-    return ("00000000" + h.toString(16)).slice(-8);
-  }
-  function hashPairs(pairs) {
-    var sorted = (pairs || []).map(function (p) { return p[0] + "," + p[1]; }).sort();
-    return fnv1aHex(sorted.join(";"));
-  }
-  function currentHashes() {
-    var out = {};
-    ["xs", "md", "lg"].forEach(function (sk) {
-      Object.keys(data.font[sk]).forEach(function (ch) {
-        out["kFont_" + sk.toUpperCase() + "_" + identForChar(ch)] = hashPairs(data.font[sk][ch]);
-      });
-    });
-    Object.keys(data.elements).forEach(function (name) {
-      out["kElement_" + sanitizeIdent(name)] = hashPairs(data.elements[name]);
-    });
-    return out;
-  }
-
-  function friendlyName(ident) {
-    var m = ident.match(/^kFont_(XS|MD|LG)_(.+)$/);
-    if (m) {
-      var sizeLabel = { XS: "Small", MD: "Medium", LG: "Large" }[m[1]];
-      var ch = identToChar(m[2]);
-      var chLabel = ch === " " ? "space" : (ch != null ? "'" + ch + "'" : m[2]);
-      return chLabel + " (" + sizeLabel + ")";
-    }
-    var m2 = ident.match(/^kElement_(.+)$/);
-    if (m2) return identToDisplay(m2[1]);
-    return ident;
-  }
-
-  function buildManifestLines() {
-    var entries = [];
-    ["xs", "md", "lg"].forEach(function (sk) {
-      Object.keys(data.font[sk]).sort().forEach(function (ch) {
-        entries.push("kFont_" + sk.toUpperCase() + "_" + identForChar(ch) + "=" + hashPairs(data.font[sk][ch]));
-      });
-    });
-    Object.keys(data.elements).sort().forEach(function (name) {
-      entries.push("kElement_" + sanitizeIdent(name) + "=" + hashPairs(data.elements[name]));
-    });
-    var lines = [], row = "";
-    entries.forEach(function (entry) {
-      if (row.length && row.length + entry.length + 1 > 96) { lines.push("// " + row); row = ""; }
-      row += (row.length ? " " : "") + entry;
-    });
-    if (row) lines.push("// " + row);
-    return lines;
-  }
-
-  function renderExport() {
-    var lines = [];
-    var cur = currentHashes();
-    var prev = data.syncedHashes;
-    var changed = Object.keys(cur).filter(function (k) { return !prev || prev[k] !== cur[k]; });
-    var total = Object.keys(cur).length;
-
-    lines.push("// ==========================================================");
-    if (!prev) {
-      lines.push("// First export from this browser -- nothing to compare against yet.");
-    } else if (changed.length === 0) {
-      lines.push("// No changes since your last Copy. Nothing new to send.");
-    } else {
-      lines.push("// CHANGED SINCE LAST COPY (" + changed.length + " of " + total + "): " +
-        changed.map(friendlyName).join(", "));
-    }
-    lines.push("// lib-version: " + (data.libVersion || 0));
-    lines.push("// ==========================================================");
-    lines.push.apply(lines, buildManifestLines());
-    lines.push("// ==========================================================");
-    lines.push("// Bit i of a mask is entry i of that size's kHexCellQR_* table");
-    lines.push("// below (same order): axial (q,r) offset from the object's own");
-    lines.push("// center. Decode: (mask[i>>3] >> (i&7)) & 1, then place with the");
-    lines.push("// same rotateAxialSteps / axial.indexAtAxial pattern already used");
-    lines.push("// by drawHexGlyphSteps.");
-    lines.push("// ==========================================================");
-    lines.push("");
-
-    ["xs", "md", "lg"].forEach(function (sk) {
-      var sz = SIZES[sk];
-      lines.push("// " + sz.label + " cell table (radius " + sz.radius + ", " + sz.cells.length + " px)" +
-        (sk === "xs" ? " -- may already exist as kHexGlyphCellQR in firmware" : ""));
-      lines.push("const int8_t kHexCellQR_" + sk.toUpperCase() + "[" + sz.cells.length + "][2] = {");
-      var rows = [];
-      for (var i = 0; i < sz.cells.length; i += 10) {
-        rows.push("  " + sz.cells.slice(i, i + 10).map(function (c) { return "{" + c.q + "," + c.r + "}"; }).join(", ") +
-          (i + 10 < sz.cells.length ? "," : ""));
-      }
-      lines.push(rows.join("\n"));
-      lines.push("};");
-      lines.push("");
-    });
-
-    lines.push("// ---- Font glyphs ----");
-    ["xs", "md", "lg"].forEach(function (sk) {
-      var sz = SIZES[sk];
-      var chars = Object.keys(data.font[sk]).sort();
-      if (!chars.length) return;
-      lines.push("");
-      lines.push("// " + sz.label + " (" + sz.cells.length + " px, " + Math.ceil(sz.cells.length / 8) + " bytes/glyph)");
-      chars.forEach(function (ch) {
-        var set = A.pairsToSet(data.font[sk][ch]);
-        var bytes = bitmaskBytes(sk, set);
-        var ident = identForChar(ch);
-        lines.push("const uint8_t kFont_" + sk.toUpperCase() + "_" + ident + "[" + bytes.length + "] PROGMEM = { " +
-          bytesToHexList(bytes) + " }; // '" + (ch === " " ? "SPACE" : ch) + "'");
-      });
-    });
-
-    lines.push("");
-    lines.push("// ---- Elements (large, " + SIZES.lg.cells.length + " px, " + Math.ceil(SIZES.lg.cells.length / 8) + " bytes each) ----");
-    Object.keys(data.elements).sort().forEach(function (name) {
-      var set = A.pairsToSet(data.elements[name]);
-      var bytes = bitmaskBytes("lg", set);
-      lines.push("const uint8_t kElement_" + sanitizeIdent(name) + "[" + bytes.length + "] PROGMEM = { " +
-        bytesToHexList(bytes) + " }; // " + name);
-    });
-
-    document.getElementById("exportOut").value = lines.join("\n");
-  }
-
-  document.getElementById("copyExportBtn").addEventListener("click", function () {
-    var out = document.getElementById("exportOut");
-    out.select();
-    var ok = false;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(out.value); ok = true; }
-    } catch (e) { /* fall through */ }
-    if (!ok) { try { document.execCommand("copy"); ok = true; } catch (e2) { /* fall through */ } }
-    if (ok) {
-      data.syncedHashes = currentHashes();
-      A.saveStorage();
-      renderExport();
-    }
-    window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, ok ? "Export copied. This is now your sync baseline." : "Select the text above and copy manually.", ok ? "ok" : "warn");
-  });
-
-  function parseImport() {
-    var text = document.getElementById("importIn").value;
-    var added = 0;
-    var snapshotTaken = false;
-    function ensureSnapshot() { if (!snapshotTaken) { A.pushUndo(); snapshotTaken = true; } }
-
-    // legacy coordinate-list elements: const int8_t kElement_NAME[][2] = {...};
-    var reLegacy = /const\s+int8_t\s+kElement_(\w+)\s*\[\s*\]\s*\[\s*2\s*\]\s*=\s*\{([\s\S]*?)\};/g;
-    var m;
-    while ((m = reLegacy.exec(text))) {
-      var body = m[2];
-      var cells = [];
-      var pairRe = /\{\s*(-?\d+)\s*,\s*(-?\d+)\s*\}/g; // fresh per match -- lastIndex must not carry over
-      var pm;
-      while ((pm = pairRe.exec(body))) cells.push([parseInt(pm[1], 10), parseInt(pm[2], 10)]);
-      if (cells.length) { ensureSnapshot(); data.elements[identToDisplay(m[1])] = cells; added++; }
-    }
-
-    // bitmask elements: const uint8_t kElement_NAME[34] PROGMEM = { 0x.., ... };
-    var reElem = /const\s+uint8_t\s+kElement_(\w+)\s*\[\s*\d+\s*\]\s*(?:PROGMEM)?\s*=\s*\{([\s\S]*?)\};/g;
-    while ((m = reElem.exec(text))) {
-      var ecells = bytesTextToCells(m[2], "lg");
-      if (ecells.length) { ensureSnapshot(); data.elements[identToDisplay(m[1])] = ecells; added++; }
-    }
-
-    // bitmask font: const uint8_t kFont_XS_A[8] PROGMEM = { 0x.., ... };
-    var reFont = /const\s+uint8_t\s+kFont_(XS|MD|LG)_(\w+)\s*\[\s*\d+\s*\]\s*(?:PROGMEM)?\s*=\s*\{([\s\S]*?)\};/g;
-    while ((m = reFont.exec(text))) {
-      var sk = m[1].toLowerCase();
-      var ch = identToChar(m[2]);
-      if (ch != null) {
-        ensureSnapshot();
-        data.font[sk][ch] = bytesTextToCells(m[3], sk);
-        added++;
-      }
-    }
-
-    var statusEl = document.getElementById("importStatus");
-    if (added > 0) {
-      A.bumpVersion();
-      A.saveStorage();
-      window.__hexaForgeUI.renderLibrary();
-      window.__hexaForgeUI.updateCharGridCustomizedMarks();
-      renderExport();
-      statusEl.textContent = "Imported " + added + " object(s).";
-      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Imported " + added + " object(s).", "ok");
-    } else {
-      statusEl.textContent = "No recognized kFont_SIZE_CHAR[] or kElement_NAME[] arrays found.";
-      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Nothing recognized in that text.", "warn");
-    }
-  }
-
-  document.getElementById("parseImportBtn").addEventListener("click", parseImport);
-
-  document.querySelectorAll(".tab-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      // commit whatever's on the canvas first -- otherwise switching straight
-      // to Export without first switching character/element shows stale data
-      window.__hexaForgeUI.commitCurrent();
-      if (btn.dataset.tab === "export") renderExport();
-      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
-      btn.classList.add("active");
-      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    });
-  });
-
   // safety net: capture an in-progress edit even if the user never clicks
-  // to another character/element/tab before closing or backgrounding the tab
-  window.addEventListener("beforeunload", function () { window.__hexaForgeUI.commitCurrent(); });
+  // to another character/element before closing or backgrounding the tab
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) window.__hexaForgeUI.commitCurrent();
   });
@@ -1601,7 +1329,7 @@
     }
   });
 
-  window.__hexaForgeIO = { renderExport: renderExport, parseImport: parseImport, loadFromServer: loadFromServer, saveToServer: saveToServer };
+  window.__hexaForgeIO = { loadFromServer: loadFromServer, saveToServer: saveToServer };
 
   /* ---------------- init ---------------- */
 
@@ -1613,9 +1341,12 @@
   window.__hexaForgeUI.renderCharGrid();
   window.__hexaForgeUI.renderLibrary();
   window.__hexaForgeUI.updateCharGridCustomizedMarks();
+  window.__hexaForgeUI.updateCharGridHighlight();
+  window.__hexaForgeUI.updateSizeTabHighlight();
+  window.__hexaForgeUI.updateFontInfo();
   window.__hexaForgeUI.refreshModeChrome();
-  A.applyActiveRadius(9);
-  A.loadCellsIntoCanvas([]);
+  A.applyActiveRadius(SIZES[A.state.sizeKey].radius);
+  A.loadCellsIntoCanvas(data.font[A.state.sizeKey][A.state.ch]);
   A.updateCount();
 
   loadFromServer().then(function () {
@@ -1630,11 +1361,9 @@
       A.loadCellsIntoCanvas(data.font[A.state.sizeKey][A.state.ch]);
     }
     A.updateCount();
-    renderExport();
     window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Loaded from patterns.h.", "ok");
   }).catch(function (e) {
     window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Couldn't reach the console server (" + e.message + ") -- showing last local copy.", "warn");
-    renderExport();
   });
 })();
 </script>

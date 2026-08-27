@@ -42,7 +42,7 @@ const unsigned long kStallLogMS = 15; // ~3 motion frames' worth
 
 #define MEASURE_PHOTO_SENSOR_BASELINE false
 PhotoSensorBrightness *autoBrightness;
-const uint8_t kDefaultBrightness = 15; // @tunable("Default Brightness", 1, 20)
+const uint8_t kDefaultBrightness = 15; // @tunable("Default Brightness", 1, 15)
 const char *kDeviceName = "motionhexa"; // @tunable_text("Device Name")
 
 DrawingContext ctx;
