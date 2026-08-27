@@ -386,6 +386,10 @@ const uint8_t *FNNAME(char c) { \
   switch (c) { \
     case ' ': return kFont_##SZ##_SPACE; \
     case '?': return kFont_##SZ##_QMARK; \
+    case '0': return kFont_##SZ##_0; case '1': return kFont_##SZ##_1; case '2': return kFont_##SZ##_2; \
+    case '3': return kFont_##SZ##_3; case '4': return kFont_##SZ##_4; case '5': return kFont_##SZ##_5; \
+    case '6': return kFont_##SZ##_6; case '7': return kFont_##SZ##_7; case '8': return kFont_##SZ##_8; \
+    case '9': return kFont_##SZ##_9; \
     case 'A': return kFont_##SZ##_A; case 'B': return kFont_##SZ##_B; case 'C': return kFont_##SZ##_C; \
     case 'D': return kFont_##SZ##_D; case 'E': return kFont_##SZ##_E; case 'F': return kFont_##SZ##_F; \
     case 'G': return kFont_##SZ##_G; case 'H': return kFont_##SZ##_H; case 'I': return kFont_##SZ##_I; \
@@ -417,20 +421,40 @@ DEFINE_HEXBITMASK_LOOKUP(hexBitmaskGlyphForChar, XS)
 // MD/LG instantiations live further down, after their kFont_MD_*/kFont_LG_*
 // constants are actually declared (this macro is still in scope until #undef)
 
-// size-generic word width/draw -- no kerning at all, every character
-// (including space) advances by the same fixed pitch, placed directly one
-// after the other; parameterized by glyph lookup + cell table so callers
-// can scroll the same text at any of the three font sizes
-float bitmaskWordWidthAtSize(int wordLen, float pitch) {
-  return wordLen * pitch;
+// size-generic word width/draw, parameterized by glyph lookup + cell table
+// so callers can scroll the same text at any of the three font sizes.
+// kerned=false: no kerning at all -- every character (including space)
+// advances by the same fixed pitch, placed directly one after the other.
+// kerned=true: per-glyph bounds-based spacing, touching each glyph's own
+// lit-pixel extent (pitch is unused in this mode).
+float bitmaskWordWidthAtSize(const char *word, int wordLen, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount, bool kerned, float pitch) {
+  if (!kerned) return wordLen * pitch;
+  float w = 0;
+  for (int i = 0; i < wordLen; ++i) {
+    if (word[i] == ' ') { w += 3.0f; continue; }
+    int minQ, maxQ;
+    hexBitmaskQBounds(glyphFn(word[i]), cellQR, cellCount, minQ, maxQ);
+    w += (maxQ - minQ);
+  }
+  return w;
 }
-void drawBitmaskWordAtSize(PixelStorage<LED_COUNT> &ctx, const char *word, int wordLen, float startQ, int startR, int rotSteps, CRGB color, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount, float pitch) {
+void drawBitmaskWordAtSize(PixelStorage<LED_COUNT> &ctx, const char *word, int wordLen, float startQ, int startR, int rotSteps, CRGB color, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount, bool kerned, float pitch) {
   float cursor = startQ;
   for (int i = 0; i < wordLen; ++i) {
-    if (word[i] != ' ') {
-      drawHexBitmaskSteps(ctx, glyphFn(word[i]), cellQR, cellCount, (int)roundf(cursor), startR, rotSteps, color);
+    if (!kerned) {
+      if (word[i] != ' ') {
+        drawHexBitmaskSteps(ctx, glyphFn(word[i]), cellQR, cellCount, (int)roundf(cursor), startR, rotSteps, color);
+      }
+      cursor += pitch;
+      continue;
     }
-    cursor += pitch;
+    if (word[i] == ' ') { cursor += 3.0f; continue; }
+    const uint8_t *mask = glyphFn(word[i]);
+    int minQ, maxQ;
+    hexBitmaskQBounds(mask, cellQR, cellCount, minQ, maxQ);
+    int origin = (int)roundf(cursor - minQ);
+    drawHexBitmaskSteps(ctx, mask, cellQR, cellCount, origin, startR, rotSteps, color);
+    cursor += (maxQ - minQ);
   }
 }
 
@@ -5579,15 +5603,16 @@ public:
       const int8_t (*cellQR)[2];
       int cellCount;
       float qPerSec, pitch;
+      bool kerned = (phase == 2); // Large keeps real per-glyph kerning; Small/Medium are fixed-pitch
       switch (phase) {
         case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 3.0f; pitch = 6.0f;  break;
         case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 4.5f; pitch = 9.0f;  break;
-        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; pitch = 14.0f; break;
+        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; pitch = 0.0f; break;
       }
       const char *word = text();
       int wordLen = strLen(word);
       const float kLoopGap = 24.0f; // blank run between the tail and the next lap
-      float totalWidth = bitmaskWordWidthAtSize(wordLen, pitch) + kLoopGap;
+      float totalWidth = bitmaskWordWidthAtSize(word, wordLen, glyphFn, cellQR, cellCount, kerned, pitch) + kLoopGap;
 
       scrollQ += qPerSec * dirMult * frameTime() / 1000.0f;
       if (scrollQ >= totalWidth) {
@@ -5598,8 +5623,8 @@ public:
         scrollQ += totalWidth; // loop backward within this size rather than stepping back a phase
       }
 
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount, pitch);
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount, pitch);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
     } else {
       // finale: flip through every glyph one at a time, centered and large
       const char *chars = flipChars();
