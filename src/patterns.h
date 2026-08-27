@@ -379,37 +379,67 @@ const uint8_t kFont_XS_y[8] = { 0x00, 0x02, 0x81, 0xF0, 0x80, 0x40, 0x10, 0x00 }
 const uint8_t kFont_XS_z[8] = { 0x00, 0x82, 0x51, 0xA1, 0xC2, 0x40, 0x00, 0x00 }; // 'z'
 const uint8_t kFont_XS_DEGREE[8] = { 0x00, 0x00, 0x00, 0x30, 0x50, 0x30, 0x00, 0x00 }; // '°'
 
-const uint8_t *hexBitmaskGlyphForChar(char c) {
-  switch (c) {
-    case ' ': return kFont_XS_SPACE;
-    case '?': return kFont_XS_QMARK;
-    case 'A': return kFont_XS_A; case 'B': return kFont_XS_B; case 'C': return kFont_XS_C;
-    case 'D': return kFont_XS_D; case 'E': return kFont_XS_E; case 'F': return kFont_XS_F;
-    case 'G': return kFont_XS_G; case 'H': return kFont_XS_H; case 'I': return kFont_XS_I;
-    case 'J': return kFont_XS_J; case 'K': return kFont_XS_K; case 'L': return kFont_XS_L;
-    case 'M': return kFont_XS_M; case 'N': return kFont_XS_N; case 'O': return kFont_XS_O;
-    case 'P': return kFont_XS_P; case 'Q': return kFont_XS_Q; case 'R': return kFont_XS_R;
-    case 'S': return kFont_XS_S; case 'T': return kFont_XS_T; case 'U': return kFont_XS_U;
-    case 'V': return kFont_XS_V; case 'W': return kFont_XS_W; case 'X': return kFont_XS_X;
-    case 'Y': return kFont_XS_Y; case 'Z': return kFont_XS_Z;
-    case 'a': return kFont_XS_a; case 'b': return kFont_XS_b; case 'c': return kFont_XS_c;
-    case 'd': return kFont_XS_d; case 'e': return kFont_XS_e; case 'f': return kFont_XS_f;
-    case 'g': return kFont_XS_g; case 'h': return kFont_XS_h; case 'i': return kFont_XS_i;
-    case 'j': return kFont_XS_j; case 'k': return kFont_XS_k; case 'l': return kFont_XS_l;
-    case 'm': return kFont_XS_m; case 'n': return kFont_XS_n; case 'o': return kFont_XS_o;
-    case 'p': return kFont_XS_p; case 'q': return kFont_XS_q; case 'r': return kFont_XS_r;
-    case 's': return kFont_XS_s; case 't': return kFont_XS_t; case 'u': return kFont_XS_u;
-    case 'v': return kFont_XS_v; case 'w': return kFont_XS_w; case 'x': return kFont_XS_x;
-    case 'y': return kFont_XS_y; case 'z': return kFont_XS_z;
-    case '!': return kFont_XS_BANG; case '&': return kFont_XS_AMP; case '\'': return kFont_XS_APOS;
-    case '(': return kFont_XS_LPAREN; case ')': return kFont_XS_RPAREN; case '+': return kFont_XS_PLUS;
-    case ',': return kFont_XS_COMMA; case '-': return kFont_XS_DASH; case '.': return kFont_XS_PERIOD;
-    case '/': return kFont_XS_SLASH; case '\\': return kFont_XS_BACKSLASH;
-    case ':': return kFont_XS_COLON; case ';': return kFont_XS_SEMI;
-    case '=': return kFont_XS_EQUALS; case '%': return kFont_XS_PERCENT;
-    // kFont_XS_DEGREE exists but has no case here -- '°' isn't representable
-    // as a single ASCII char, so it's not reachable through this char-keyed switch
-    default: return kFont_XS_SPACE;
+// generates one glyph-lookup function per size (identical logic, different
+// kFont_<SZ>_* constants) -- MD/LG have the exact same char coverage as XS
+#define DEFINE_HEXBITMASK_LOOKUP(FNNAME, SZ) \
+const uint8_t *FNNAME(char c) { \
+  switch (c) { \
+    case ' ': return kFont_##SZ##_SPACE; \
+    case '?': return kFont_##SZ##_QMARK; \
+    case 'A': return kFont_##SZ##_A; case 'B': return kFont_##SZ##_B; case 'C': return kFont_##SZ##_C; \
+    case 'D': return kFont_##SZ##_D; case 'E': return kFont_##SZ##_E; case 'F': return kFont_##SZ##_F; \
+    case 'G': return kFont_##SZ##_G; case 'H': return kFont_##SZ##_H; case 'I': return kFont_##SZ##_I; \
+    case 'J': return kFont_##SZ##_J; case 'K': return kFont_##SZ##_K; case 'L': return kFont_##SZ##_L; \
+    case 'M': return kFont_##SZ##_M; case 'N': return kFont_##SZ##_N; case 'O': return kFont_##SZ##_O; \
+    case 'P': return kFont_##SZ##_P; case 'Q': return kFont_##SZ##_Q; case 'R': return kFont_##SZ##_R; \
+    case 'S': return kFont_##SZ##_S; case 'T': return kFont_##SZ##_T; case 'U': return kFont_##SZ##_U; \
+    case 'V': return kFont_##SZ##_V; case 'W': return kFont_##SZ##_W; case 'X': return kFont_##SZ##_X; \
+    case 'Y': return kFont_##SZ##_Y; case 'Z': return kFont_##SZ##_Z; \
+    case 'a': return kFont_##SZ##_a; case 'b': return kFont_##SZ##_b; case 'c': return kFont_##SZ##_c; \
+    case 'd': return kFont_##SZ##_d; case 'e': return kFont_##SZ##_e; case 'f': return kFont_##SZ##_f; \
+    case 'g': return kFont_##SZ##_g; case 'h': return kFont_##SZ##_h; case 'i': return kFont_##SZ##_i; \
+    case 'j': return kFont_##SZ##_j; case 'k': return kFont_##SZ##_k; case 'l': return kFont_##SZ##_l; \
+    case 'm': return kFont_##SZ##_m; case 'n': return kFont_##SZ##_n; case 'o': return kFont_##SZ##_o; \
+    case 'p': return kFont_##SZ##_p; case 'q': return kFont_##SZ##_q; case 'r': return kFont_##SZ##_r; \
+    case 's': return kFont_##SZ##_s; case 't': return kFont_##SZ##_t; case 'u': return kFont_##SZ##_u; \
+    case 'v': return kFont_##SZ##_v; case 'w': return kFont_##SZ##_w; case 'x': return kFont_##SZ##_x; \
+    case 'y': return kFont_##SZ##_y; case 'z': return kFont_##SZ##_z; \
+    case '!': return kFont_##SZ##_BANG; case '&': return kFont_##SZ##_AMP; case '\'': return kFont_##SZ##_APOS; \
+    case '(': return kFont_##SZ##_LPAREN; case ')': return kFont_##SZ##_RPAREN; case '+': return kFont_##SZ##_PLUS; \
+    case ',': return kFont_##SZ##_COMMA; case '-': return kFont_##SZ##_DASH; case '.': return kFont_##SZ##_PERIOD; \
+    case '/': return kFont_##SZ##_SLASH; case '\\': return kFont_##SZ##_BACKSLASH; \
+    case ':': return kFont_##SZ##_COLON; case ';': return kFont_##SZ##_SEMI; \
+    case '=': return kFont_##SZ##_EQUALS; case '%': return kFont_##SZ##_PERCENT; \
+    default: return kFont_##SZ##_SPACE; \
+  } \
+}
+DEFINE_HEXBITMASK_LOOKUP(hexBitmaskGlyphForChar, XS)
+// MD/LG instantiations live further down, after their kFont_MD_*/kFont_LG_*
+// constants are actually declared (this macro is still in scope until #undef)
+
+// size-generic word width/draw -- same zero-gap kerning rule as the XS-only
+// helpers below, parameterized by glyph lookup + cell table so callers can
+// scroll the same text at any of the three font sizes
+float bitmaskWordWidthAtSize(const char *word, int wordLen, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount) {
+  float w = 0;
+  for (int i = 0; i < wordLen; ++i) {
+    if (word[i] == ' ') { w += 3.0f; continue; }
+    int minQ, maxQ;
+    hexBitmaskQBounds(glyphFn(word[i]), cellQR, cellCount, minQ, maxQ);
+    w += (maxQ - minQ);
+  }
+  return w;
+}
+void drawBitmaskWordAtSize(PixelStorage<LED_COUNT> &ctx, const char *word, int wordLen, float startQ, int startR, int rotSteps, CRGB color, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount) {
+  float cursor = startQ;
+  for (int i = 0; i < wordLen; ++i) {
+    if (word[i] == ' ') { cursor += 3.0f; continue; }
+    const uint8_t *mask = glyphFn(word[i]);
+    int minQ, maxQ;
+    hexBitmaskQBounds(mask, cellQR, cellCount, minQ, maxQ);
+    int origin = (int)roundf(cursor - minQ);
+    drawHexBitmaskSteps(ctx, mask, cellQR, cellCount, origin, startR, rotSteps, color);
+    cursor += (maxQ - minQ);
   }
 }
 
@@ -541,6 +571,7 @@ const uint8_t kFont_MD_x[16] = { 0x00, 0x20, 0x60, 0x40, 0x60, 0x0F, 0xFF, 0x80,
 const uint8_t kFont_MD_y[16] = { 0x00, 0x20, 0x60, 0x80, 0x01, 0x06, 0x20, 0xF0, 0x03, 0x34, 0x00, 0x01, 0x06, 0x0C, 0x0C, 0x00 }; // 'y'
 const uint8_t kFont_MD_z[16] = { 0x00, 0x20, 0x60, 0xC0, 0x21, 0x09, 0xDB, 0x60, 0x1B, 0x3C, 0xC0, 0x01, 0x06, 0x08, 0x00, 0x00 }; // 'z'
 const uint8_t kFont_MD_DEGREE[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x70, 0x00, 0x0D, 0xC8, 0xC0, 0x01, 0x01, 0x00, 0x00 }; // '°'
+DEFINE_HEXBITMASK_LOOKUP(hexBitmaskGlyphForCharMD, MD)
 
 // Large (271px) digit glyphs -- a single full-screen digit, one at a time
 const uint8_t kFont_LG_0[34] = { 0x00, 0x00, 0x00, 0x7F, 0xF8, 0x0F, 0xFF, 0xC3, 0xC1, 0xA1, 0xC0, 0xA1, 0x80, 0x43, 0x01, 0x0A, 0x05, 0x50, 0x28, 0x40, 0xA1, 0x80, 0xC2, 0x81, 0xC3, 0xC1, 0xE1, 0x7F, 0xF8, 0x0F, 0x7F, 0x00, 0x00, 0x00 };
@@ -630,6 +661,8 @@ const uint8_t kFont_LG_x[34] = { 0x00, 0x00, 0x00, 0xE0, 0x00, 0x0C, 0xC0, 0x00,
 const uint8_t kFont_LG_y[34] = { 0x00, 0x00, 0x00, 0xE0, 0x00, 0x0C, 0x00, 0x07, 0x80, 0x01, 0xE0, 0x00, 0xC0, 0x00, 0xB5, 0x01, 0xFC, 0x07, 0xA0, 0x1F, 0x00, 0x30, 0x00, 0x30, 0x00, 0x1C, 0x00, 0x06, 0xE0, 0x00, 0x0C, 0x40, 0x00, 0x00 }; // 'y'
 const uint8_t kFont_LG_z[34] = { 0x00, 0x00, 0x00, 0xE0, 0x00, 0x0C, 0xC0, 0x07, 0xE0, 0x81, 0x19, 0x83, 0x31, 0x03, 0xC6, 0x1C, 0x30, 0x66, 0x80, 0x19, 0x03, 0x3E, 0x00, 0x3C, 0x00, 0x1C, 0x00, 0x06, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00 }; // 'z'
 const uint8_t kFont_LG_DEGREE[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '°'
+DEFINE_HEXBITMASK_LOOKUP(hexBitmaskGlyphForCharLG, LG)
+#undef DEFINE_HEXBITMASK_LOOKUP
 
 // Elements (271px)
 const uint8_t kElement_HOURGLASS_LARGE[34] = { 0x00, 0x00, 0x0C, 0xA0, 0x00, 0x12, 0x40, 0x04, 0x10, 0x02, 0x08, 0x02, 0x08, 0xE4, 0x1F, 0x90, 0x00, 0x80, 0x04, 0xFC, 0x13, 0x08, 0x20, 0x08, 0x20, 0x04, 0x10, 0x01, 0x24, 0x80, 0x02, 0x18, 0x00, 0x00 };
@@ -5504,44 +5537,95 @@ public:
 // readable pace, not as a showpiece pattern.
 class ScrollingFontTest : public Pattern { // @thumbnail("#FF3B30", "#FFCC00", "#34C759", "#5AC8FA")
 public:
+  // every letter, digit, and punctuation glyph hexBitmaskGlyphForChar* has a
+  // case for -- doubles as a "did I forget to wire up a symbol" check. Same
+  // text scrolls at all 3 sizes before the pattern moves on.
+  static const char *text() {
+    static const char t[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ   abcdefghijklmnopqrstuvwxyz   1234567890   "
+      ".,:;!?-+=%/\\()&'   The quick brown fox jumps over the lazy dog.   "
+      "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG.        ";
+    return t;
+  }
+  static const char *flipChars() {
+    static const char t[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;!?-+=%/\\()&'";
+    return t;
+  }
+  static int strLen(const char *s) { int n = 0; while (s[n]) n++; return n; }
+
+  int phase = 0; // 0=Small scroll, 1=Medium scroll, 2=Large scroll, 3=flip through every glyph
   float scrollQ = 0;
+  float flipPos = 0;
   vector32 smoothAcc;
 
-  void update() {
-    ctx.leds.fill_solid(CRGB::Black);
-
-    // every letter, digit, and every punctuation glyph hexBitmaskGlyphForChar
-    // actually has a case for -- this string doubles as a "did I forget to
-    // wire up a symbol" check
-    static const char text[] =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZ   abcdefghijklmnopqrstuvwxyz   1234567890   "
-      ".,:;!?-+=%/\\()&'   The quick brown fox jumps over the lazy dog.        ";
-    const int wordLen = sizeof(text) - 1;
-    const float kLoopGap = 24.0f; // blank run between the tail and the next lap
-    float totalWidth = bitmaskWordWidth(text, wordLen) + kLoopGap;
-
-    // in-plane acceleration (perpendicular to whichever axis is currently
-    // reading gravity) drives scroll speed -- resting flat scrolls at the
-    // base rate, tilting the hexa off flat ramps it up fast, and shaking it
-    // ramps it up further still. Independent of the color fade below.
+  // tilt front/back (same az/mag convention RickRoll's playback-speed tilt
+  // uses) maps to a signed speed multiplier: flat = normal forward, tilt
+  // forward = speeds up forward, tilt backward = slows to a stop and then
+  // reverses -- one control drives both scroll and the glyph-flip phase
+  float tiltDirMultiplier() {
     ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
     vector32 acc(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
     smoothAcc = (6 * smoothAcc + acc) / 7;
-    const float accScale = (MotionManager::manager().enableDMP ? 1000.0f : 2000.0f);
-    float tiltMag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y) / accScale;
+    float mag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y + (float)smoothAcc.z * smoothAcc.z);
+    const float kDeadzone = 0.15f;
+    const float kMaxForward = 6.0f;
+    const float kMaxBackward = 4.0f;
+    float tiltFrontBack = (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0;
+    float absTilt = fabsf(tiltFrontBack);
+    if (absTilt <= kDeadzone) return 1.0f;
+    float t = (absTilt - kDeadzone) / (1.0f - kDeadzone);
+    float eased = t * t;
+    return (tiltFrontBack > 0) ? (1.0f + eased * (kMaxForward - 1.0f)) : (-eased * kMaxBackward);
+  }
 
-    const float kBaseQPerSec = 7.0f;
-    const float kTiltGain = 12.0f;
-    float speedMultiplier = 1.0f + min(tiltMag, 2.5f) * kTiltGain;
-    scrollQ += kBaseQPerSec * speedMultiplier * frameTime() / 1000.0f;
-    scrollQ = fmodf(scrollQ, totalWidth);
-
-    // hue fade runs off the wall clock, not scrollQ, so it stays a steady,
-    // pleasant cycle no matter how fast tilt is driving the scroll
+  void update() {
+    ctx.leds.fill_solid(CRGB::Black);
+    float dirMult = tiltDirMultiplier();
+    // hue fade runs off the wall clock, not scroll/flip position, so it
+    // stays a steady, pleasant cycle no matter how fast tilt drives things
     CRGB color = CHSV((uint8_t)(millis() / 32), 0xFF, 0xFF);
 
-    drawBitmaskWordAt(ctx, text, wordLen, -scrollQ, 0, 0, color);
-    drawBitmaskWordAt(ctx, text, wordLen, -scrollQ + totalWidth, 0, 0, color);
+    if (phase < 3) {
+      const uint8_t *(*glyphFn)(char);
+      const int8_t (*cellQR)[2];
+      int cellCount;
+      float qPerSec;
+      switch (phase) {
+        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 3.0f; break;
+        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 4.5f; break;
+        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; break;
+      }
+      const char *word = text();
+      int wordLen = strLen(word);
+      const float kLoopGap = 24.0f; // blank run between the tail and the next lap
+      float totalWidth = bitmaskWordWidthAtSize(word, wordLen, glyphFn, cellQR, cellCount) + kLoopGap;
+
+      scrollQ += qPerSec * dirMult * frameTime() / 1000.0f;
+      if (scrollQ >= totalWidth) {
+        scrollQ -= totalWidth;
+        phase = (phase + 1) % 4;
+        if (phase == 3) flipPos = 0;
+      } else if (scrollQ < 0) {
+        scrollQ += totalWidth; // loop backward within this size rather than stepping back a phase
+      }
+
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount);
+    } else {
+      // finale: flip through every glyph one at a time, centered and large
+      const char *chars = flipChars();
+      int nChars = strLen(chars);
+      const float kCharsPerSec = 2.2f;
+      flipPos += kCharsPerSec * dirMult * frameTime() / 1000.0f;
+      if (flipPos >= nChars) { flipPos -= nChars; phase = 0; scrollQ = 0; }
+      else if (flipPos < 0) { flipPos += nChars; }
+
+      const uint8_t *mask = hexBitmaskGlyphForCharLG(chars[(int)flipPos]);
+      int minQ, maxQ;
+      hexBitmaskQBounds(mask, kHexCellQR_LG, 271, minQ, maxQ);
+      drawHexBitmaskSteps(ctx, mask, kHexCellQR_LG, 271, -(minQ + maxQ) / 2, 0, 0, color);
+    }
   }
 
   const char *description() {
