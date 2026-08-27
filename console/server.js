@@ -440,6 +440,20 @@ function scanThumbnails() {
   return out;
 }
 
+// @instructions("...") can trail anywhere on a pattern's class line (e.g.
+// after an existing @thumbnail(...)), not just as the first tag -- unlike
+// scanThumbnails' regex, this one isn't anchored to immediately follow "// "
+function scanInstructions() {
+  const text = fs.readFileSync(PATTERNS_H, "utf8");
+  const out = {};
+  const re = /class\s+(\w+)\s*:[^\n{]*\{[^\n]*@instructions\("([^"]*)"\)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    out[m[1]] = m[2];
+  }
+  return out;
+}
+
 /* ---------------- build / deploy (streamed) ---------------- */
 
 function runPio(args, res) {
@@ -493,12 +507,12 @@ const server = http.createServer(function (req, res) {
 
   try {
     if (req.method === "GET" && url.pathname === "/api/patterns") {
-      return sendJson(res, 200, { patterns: parsePatterns(), thumbnails: scanThumbnails() });
+      return sendJson(res, 200, { patterns: parsePatterns(), thumbnails: scanThumbnails(), instructions: scanInstructions() });
     }
     if (req.method === "POST" && url.pathname === "/api/patterns") {
       return readBody(req).then(function (body) {
         writePatterns(body.patterns);
-        sendJson(res, 200, { ok: true, patterns: parsePatterns(), thumbnails: scanThumbnails() });
+        sendJson(res, 200, { ok: true, patterns: parsePatterns(), thumbnails: scanThumbnails(), instructions: scanInstructions() });
       }).catch(function (e) { sendJson(res, 400, { error: e.message }); });
     }
     if (req.method === "GET" && url.pathname === "/api/config") {

@@ -1,6 +1,6 @@
 "use strict";
 
-var state = { patterns: [], thumbnails: {}, tunables: [], dirty: false, openSettingsFor: null };
+var state = { patterns: [], thumbnails: {}, instructions: {}, tunables: [], dirty: false, openSettingsFor: null };
 
 var patternListEl = document.getElementById("patternList");
 var dirtyDot = document.getElementById("dirtyDot");
@@ -147,12 +147,14 @@ function renderPatterns() {
     name.textContent = p.name;
 
     var myTunables = tunablesFor(p.name);
+    var myInstructions = state.instructions[p.name];
+    var hasPanel = myTunables.length > 0 || !!myInstructions;
     var isOpen = state.openSettingsFor === p.name;
     var disclosure = document.createElement("button");
-    disclosure.className = "disclosure" + (myTunables.length ? " has-settings" : "") + (isOpen ? " open" : "");
+    disclosure.className = "disclosure" + (hasPanel ? " has-settings" : "") + (isOpen ? " open" : "");
     disclosure.innerHTML = DISCLOSURE_SVG;
-    disclosure.title = myTunables.length ? "Settings" : "No adjustable settings for this program";
-    disclosure.disabled = !myTunables.length;
+    disclosure.title = hasPanel ? "Settings" : "No adjustable settings for this program";
+    disclosure.disabled = !hasPanel;
     disclosure.addEventListener("click", function () {
       state.openSettingsFor = isOpen ? null : p.name;
       renderPatterns();
@@ -165,10 +167,18 @@ function renderPatterns() {
     li.appendChild(disclosure);
     patternListEl.appendChild(li);
 
-    if (isOpen && myTunables.length) {
+    if (isOpen && hasPanel) {
       var settingsDiv = document.createElement("div");
       settingsDiv.className = "effect-settings";
-      renderConfigInto(settingsDiv, myTunables, function () { setDirty(true); });
+      if (myInstructions) {
+        var instructionsP = document.createElement("p");
+        instructionsP.className = "instructions";
+        instructionsP.textContent = myInstructions;
+        settingsDiv.appendChild(instructionsP);
+      }
+      if (myTunables.length) {
+        renderConfigInto(settingsDiv, myTunables, function () { setDirty(true); });
+      }
       patternListEl.appendChild(settingsDiv);
     }
 
@@ -218,6 +228,7 @@ function loadAll() {
   ]).then(function (results) {
     state.patterns = results[0].patterns;
     state.thumbnails = results[0].thumbnails || {};
+    state.instructions = results[0].instructions || {};
     state.tunables = results[1].tunables;
     renderPatterns();
     setDirty(false);

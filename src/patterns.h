@@ -906,7 +906,7 @@ DEFINE_GRADIENT_PALETTE( EarthToneHands_gp ) {
 // 9 Amber:   digital HH/MM readout, warm retro all-amber-on-near-black display, TICKING amber seconds ring
 enum ClockDial { kEarthDial = 0, kGreyDial, kBlackDial, kLagoonDial, kSunsetDial, kNeonDial, kCometDial, kBladeDial, kCircuitDial, kAmberDial, kDialCount };
 
-class AnalogClock : public Pattern { // @thumbnail("#6E5032", "#DC823C", "#EBA54B", "#A5B969")
+class AnalogClock : public Pattern { // @thumbnail("#6E5032", "#DC823C", "#EBA54B", "#A5B969") @instructions("Tilt left or right to fast-forward or rewind time -- a light tilt is gentle, a steep one races. Tip the hexa forward or backward to cycle through 10 dial styles. Tip it nearly flat onto its back and hold for a second to reset the seconds to :00. For fine control, a light tilt below the fast-forward threshold plus a sharp tap jumps the time by exactly one minute forward or back.")
 public:
   const double kStartSeconds = 6*3600.0 + 20*60.0 + 10.0; // clock starts at 6:20:10
   const unsigned long kColorCycleMS = 90000;      // full earth-tone cycle for the Earth dial's hands, at 1x speed
@@ -1097,23 +1097,6 @@ public:
     drawHandInto(buf, lengthFrac, length, spineColor);
   }
 
-  // classic continuous dot-matrix digit font (not segment-derived): every digit
-  // is one unbroken stroke top to bottom, which reads more cleanly at this size
-  // than the previous 7-segment-style font (e.g. its "1" and "7" had a blank
-  // gap in the middle row where the missing middle segment would have been).
-  const uint8_t kDigitFont[10][7] = {
-    {0b01110,0b10001,0b10011,0b10101,0b11001,0b10001,0b01110}, // 0
-    {0b00100,0b01100,0b00100,0b00100,0b00100,0b00100,0b01110}, // 1
-    {0b01110,0b10001,0b00001,0b00010,0b00100,0b01000,0b11111}, // 2
-    {0b11111,0b00010,0b00100,0b00010,0b00001,0b10001,0b01110}, // 3
-    {0b00010,0b00110,0b01010,0b10010,0b11111,0b00010,0b00010}, // 4
-    {0b11111,0b10000,0b11110,0b00001,0b00001,0b10001,0b01110}, // 5
-    {0b00110,0b01000,0b10000,0b11110,0b10001,0b10001,0b01110}, // 6
-    {0b11111,0b00001,0b00010,0b00100,0b01000,0b01000,0b01000}, // 7
-    {0b01110,0b10001,0b10001,0b01110,0b10001,0b10001,0b01110}, // 8
-    {0b01110,0b10001,0b10001,0b01111,0b00001,0b00010,0b01100}, // 9
-  };
-
   // places a single pixel at a "local" (X,Y) offset in the face's own rotated
   // frame (+Y toward 12, +X toward 3) -- rotation-aware generalization of
   // drawHandInto/drawMarkerInto's math, used to lay out the digit dials so they
@@ -1129,23 +1112,36 @@ public:
     }
   }
 
-  // draws one digit with its top-left corner at local (leftX, topY), growing
-  // right and down from there
-  void drawDigitGlyphInto(PixelStorage<LED_COUNT> &buf, int digit, float leftX, float topY, CRGB color) {
+  // draws one Small hex-font digit (the real hand-customized set from the
+  // Fonts & Elements tool, not a generic rect font) centered at local
+  // (centerX, centerY). Reuses drawLocalPixelInto per lit cell, so the whole
+  // glyph shape rotates and lands correctly in the dial's own rotated frame
+  // exactly like the hands/markers do -- no separate rotation step needed.
+  void drawDigitGlyphInto(PixelStorage<LED_COUNT> &buf, int digit, float centerX, float centerY, CRGB color) {
     if (digit < 0 || digit > 9) return;
-    for (int gr = 0; gr < 7; ++gr) {
-      uint8_t rowBits = kDigitFont[digit][gr];
-      for (int gc = 0; gc < 5; ++gc) {
-        if (!((rowBits >> (4 - gc)) & 1)) continue;
-        drawLocalPixelInto(buf, leftX + gc, topY - gr, color);
-      }
+    const uint8_t *mask = hexBitmaskDigitXS(digit);
+    for (int i = 0; i < 61; ++i) {
+      if (!((mask[i >> 3] >> (i & 7)) & 1)) continue;
+      vectorf cellRect = axial.hexToRect(fAxial((float)kHexCellQR_XS[i][0], (float)kHexCellQR_XS[i][1]), 1.0f);
+      drawLocalPixelInto(buf, centerX + cellRect.x, centerY + cellRect.y, color);
     }
   }
 
-  // two digits (tens, ones) side by side, top edge at local Y=topY
-  void drawTwoDigitInto(PixelStorage<LED_COUNT> &buf, int value, float topY, CRGB color) {
-    drawDigitGlyphInto(buf, (value / 10) % 10, -5, topY, color);
-    drawDigitGlyphInto(buf, value % 10,          1, topY, color);
+  // two Small digits (tens, ones) side by side, centered at local Y=centerY --
+  // spacing is derived from each digit's own real ink width (via
+  // hexBitmaskQBounds) rather than a fixed gap, so it stays reasonably tight
+  // without the two ever overlapping
+  void drawTwoDigitInto(PixelStorage<LED_COUNT> &buf, int value, float centerY, CRGB color) {
+    const float kDigitGap = 1.5f; // local-X gap between the two digits' facing edges
+    int tens = (value / 10) % 10, ones = value % 10;
+    int tensMinQ, tensMaxQ, onesMinQ, onesMaxQ;
+    hexBitmaskQBounds(hexBitmaskDigitXS(tens), kHexCellQR_XS, 61, tensMinQ, tensMaxQ);
+    hexBitmaskQBounds(hexBitmaskDigitXS(ones), kHexCellQR_XS, 61, onesMinQ, onesMaxQ);
+    vectorf qUnit = axial.hexToRect(fAxial(1.0f, 0.0f), 1.0f); // local-X distance one q-step covers
+    float tensWidth = (tensMaxQ - tensMinQ) * qUnit.x;
+    float onesWidth = (onesMaxQ - onesMinQ) * qUnit.x;
+    drawDigitGlyphInto(buf, tens, -kDigitGap / 2.0f - tensWidth / 2.0f, centerY, color);
+    drawDigitGlyphInto(buf, ones,  kDigitGap / 2.0f + onesWidth / 2.0f, centerY, color);
   }
 
   // marker at the given clock fraction (0=12, 0.25=3, 0.5=6, 0.75=9): a solid
@@ -1373,8 +1369,8 @@ public:
         int hourVal = ((int)(hourFrac * 12)) % 12; if (hourVal == 0) hourVal = 12;
         int minuteVal = ((int)(minuteFrac * 60)) % 60;
         CRGB green(50, 230, 90);
-        drawTwoDigitInto(buf, hourVal, 7, green);
-        drawTwoDigitInto(buf, minuteVal, -1, green);
+        drawTwoDigitInto(buf, hourVal, 4.5f, green);
+        drawTwoDigitInto(buf, minuteVal, -4.5f, green);
         drawLocalPixelInto(buf, 0, 0, CRGB(20, 80, 35));  // dim green separator accent
         drawSecondsRingInto(buf, secondFrac, CRGB::White);
         drawMarkerInto(buf, 0.0f, green);
@@ -1386,8 +1382,8 @@ public:
         int hourVal = ((int)(hourFrac * 12)) % 12; if (hourVal == 0) hourVal = 12;
         int minuteVal = ((int)(minuteFrac * 60)) % 60;
         CRGB amber(255, 140, 20);
-        drawTwoDigitInto(buf, hourVal, 7, amber);
-        drawTwoDigitInto(buf, minuteVal, -1, amber);
+        drawTwoDigitInto(buf, hourVal, 4.5f, amber);
+        drawTwoDigitInto(buf, minuteVal, -4.5f, amber);
         drawLocalPixelInto(buf, 0, 0, CRGB(180, 90, 10));
         drawSecondsRingInto(buf, tickingSecondFrac, CRGB(255, 170, 40));
         drawMarkerInto(buf, 0.0f, amber);
@@ -1603,7 +1599,7 @@ public:
 // -- tilt is spent on scene selection (or, face down, panning the sky) once
 // you're off the flat-facing-up orientation, so it isn't also asked to
 // control speed there.
-class SolarSystem : public Pattern { // @thumbnail("#468CDC", "#D25A3C", "#DCAA6E", "#FFDC64")
+class SolarSystem : public Pattern { // @thumbnail("#468CDC", "#D25A3C", "#DCAA6E", "#FFDC64") @instructions("Lay it flat face-up for the Solar System -- tilt to speed up, slow down, or reverse the planets' orbits. Flip it flat face-down for a starry night sky. Stand it up on an edge for one of three fixed scenes: the 4 o'clock edge for a sunrise sky with the occasional meteor, 6 o'clock for a realistic moon phase, and 8 o'clock for a rotating zodiac wheel.")
 public:
   enum Scene { kSolarScene = 0, kMoonScene, kSunriseScene, kAstrologyScene, kSkyScene };
 
