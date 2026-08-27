@@ -2,12 +2,10 @@
 
 A local, zero-install browser tool for editing a [motionhexa](https://www.tindie.com/products/starduststorm/the-hexagon/) — a motion-reactive, battery-powered hexagonal LED sculpture — without touching C++. Manage which patterns run, paint custom pixel fonts, tune device settings, and build & flash the firmware, all from one page in your browser.
 
-This repo is the Config Tool first, and a firmware fork second: it bundles the full motionhexa firmware (originally by [starduststorm](https://github.com/starduststorm/motionhexa)) plus a couple dozen new LED patterns, mostly built to give the tool something real to edit and show off.
-
 > This repository's descriptions and day-to-day upkeep are managed collaboratively with [Claude](https://claude.com) (Anthropic).
 
-<img src="doc/assets/hexa_front.jpg" alt="photo of motionhexa pixels panel" height="320">
-<img src="doc/assets/hexa_back_assembled.jpg" alt="photo of back of assembled motionhexa" height="320">
+<img src="doc/assets/console_programs.png" alt="Config Tool: Programs tab, showing the drag-to-reorder pattern list with live thumbnails" width="49%">
+<img src="doc/assets/console_forge.png" alt="Config Tool: Fonts &amp; Elements tab, the pixel font editor" width="49%">
 
 ## What it does
 
@@ -16,7 +14,7 @@ This repo is the Config Tool first, and a firmware fork second: it bundles the f
 - **System** — device name, default brightness, and charge-indicator style
 - **Build & Deploy** — compiles with PlatformIO and flashes the connected device, streamed live, from the header of every page
 
-Every edit writes straight to the real source files (`src/main.cpp`, `src/patterns.h`) — there's no separate config format to keep in sync. New settings just need a trailing tag comment (`@tunable`, `@tunable_text`, `@tunable_enum`, `@thumbnail`) on the constant they control; see [Adding a setting](#adding-a-setting) below.
+Every edit writes straight to the real source files (`src/main.cpp`, `src/patterns.h`) — no separate config format to keep in sync. This repo bundles the full motionhexa firmware (originally by [starduststorm](https://github.com/starduststorm/motionhexa)) plus a couple dozen new LED patterns, built mostly to give the tool something real to edit and show off.
 
 ## Quick start
 
@@ -50,65 +48,24 @@ class TriBounce : public BouncyPixels { // @thumbnail("#FF0000", "#80FF00", "#00
 
 If the value you want to tag is an inline literal (a constructor argument, say) rather than a named constant, pull it out into one first.
 
-## Writing a new pattern
+---
 
-Subclass `Pattern` in `src/patterns.h`:
+## The hardware & original firmware
 
-```cpp
-class MyAwesomePattern : public Pattern {
-public:
-  void update() {
-    for (int px = 0; px < ctx.leds.size(); ++px) {
-      ctx.leds[px] = CHSV(10 * px - millis() / 10, 0xFF, 0xFF);
-    }
-  }
-  const char *description() { return "MyAwesomePattern"; }
-};
-```
+<img src="doc/assets/hexa_front.jpg" alt="photo of motionhexa pixels panel" height="220"> <img src="doc/assets/hexa_back_assembled.jpg" alt="photo of back of assembled motionhexa" height="220">
 
-Then register it in `src/main.cpp`'s `setup()`:
+Motionhexa is [starduststorm](https://github.com/starduststorm/motionhexa)'s hexagonal LED sculpture: RP2040, ICM-20948 motion sensor, PDM microphone, USB-C rechargeable battery, 271 SK9822 pixels. A squeeze-through-the-case button controls it directly (click for next pattern, double-click for previous, hold to power on/off or soft-reset). PCB sources are in `hexacontroller/` and `hexa/`; a couple of hardware quirks (a disabled ambient-light sensor, a disabled 5V boost circuit, a v5 charging-ring errata) are noted inline in that source.
 
-```cpp
-patternManager.registerPattern<MyAwesomePattern>();
-```
-
-It'll show up in the Config Tool's Programs list automatically. Registration order is playback order.
-
-## Building the firmware
-
-Built with [PlatformIO](https://platformio.org) — build the `v5` environment, which targets the MakerFaire2025 hardware revision.
-
+**Building:** built with [PlatformIO](https://platformio.org); build the `v5` environment (the MakerFaire2025 hardware revision).
 ```
 git submodule update --init --recursive
 pio run -e v5
 ```
+Dependencies ([FastLED], [SparkFun_ICM-20948], [edrean/BQ27427 Battery Fuel Gauge], [dustlib]) fetch automatically on first build.
 
-Dependencies ([FastLED], [SparkFun_ICM-20948], [edrean/BQ27427 Battery Fuel Gauge], [dustlib]) are fetched automatically on first build.
+**Writing a pattern by hand:** subclass `Pattern` in `src/patterns.h` and register it in `src/main.cpp`'s `setup()` with `patternManager.registerPattern<YourPattern>()` — it'll show up in the Config Tool automatically. See any existing pattern in `patterns.h` for the shape.
 
-### Recovering a device that won't boot
-
-If the hexa stops responding and won't re-flash normally, put it into RP2040 USBBOOT mode:
-
-1. Carefully open the case with a flat, blunt tool, avoiding the battery.
-2. Find the USBBOOT button on the hexacontroller board:
-   <img src="doc/assets/usb_boot.jpg" alt="location of USBBOOT button" height="180">
-3. Hold it while plugging into USB — a "RPI-RP2" mass-storage drive should appear.
-4. Either re-flash with PlatformIO, or copy [the stable release binary](bin/hexa-v5-firmware@ed502d04.uf2) onto the drive; it reboots automatically once the copy finishes.
-
-## The hardware
-
-RP2040 dual-core ARM, ICM-20948 motion sensor, LMD4030 PDM microphone, BQ27421 battery monitor, SK9822-EC20 pixels, USB-C rechargeable via an LP28013HQVF lipo charger. PCB sources are in `hexacontroller/` (logic/power/motion) and `hexa/` (the 271-pixel hex lattice).
-
-A physical button (squeeze through the case) controls it directly: single click for next pattern, double click for previous, a 1-second hold to power on/off, a 10-second hold for a soft reset.
-
-<details>
-<summary>Disabled hardware &amp; known errata</summary>
-
-- An ALS-PT19-315 ambient light sensor for autobrightness is disabled — its response time is too slow to subtract out light from nearby pixels during patterns. Might still work for a one-shot brightness read at startup.
-- An MT3608-based 5V boost circuit is disabled — the pixels show no color-loss issues running directly on lipo voltage.
-- **v5 errata:** the charging ring can remain lit after unplugging due to unexpected voltage on VBUS. Mitigated in `1e0326c` by fully powering off when the device is manually turned off.
-
-</details>
+**If a device won't boot:** hold the USBBOOT button on the hexacontroller board while plugging in USB to force RP2040 mass-storage mode, then re-flash with PlatformIO or drop [the stable release binary](bin/hexa-v5-firmware@ed502d04.uf2) onto the drive that appears.
 
 ## Roadmap / project direction
 
