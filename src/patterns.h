@@ -5504,7 +5504,7 @@ public:
           uint8_t v = 180 + sparkle / 14;
           c = CHSV(28 + hueJitter, 235, v);
         } else {
-          c = CHSV(bgHue, 110, qadd8(bgBri, 10)); // frosted glass, same field, a touch brighter
+          c = CRGB::Black; // empty chamber space -- no interior glow, just the sand and the rim
         }
       } else {
         c = CHSV(bgHue, 205, bgBri);
@@ -5513,8 +5513,12 @@ public:
     }
 
     // soft glow bleeding off the rim -- drawn before the rim itself so the
-    // rim always reads crisp and bright on top of it
-    uint8_t glowPulse = beatsin8(4, 18, 50);
+    // rim always reads crisp and bright on top of it. Pulse rate and range
+    // both scale with motionEnergy: calm slow breathing at rest, faster and
+    // wider swings the more the hexa's being moved.
+    uint8_t glowRate = 4 + (uint8_t)(motionEnergy * 22);
+    uint8_t glowMax = 50 + (uint8_t)(motionEnergy * 130);
+    uint8_t glowPulse = beatsin8(glowRate, 18, glowMax);
     CRGB glowColor = CHSV(150, 75, glowPulse);
     for (PixelIndex px : haloPixels) {
       ctx.leds[px] = glowColor;
@@ -5529,12 +5533,14 @@ public:
       drawLocalPixel(g.x, y, CRGB(255, 220, 140));
     }
 
-    // the rim itself: steady and bright -- no random twinkle at all now, just
-    // a very slow, shallow shimmer plus a gentle motion-linked brighten so it
-    // still feels alive without ever reading as "flashing"
+    // the rim itself: steady and bright at rest -- shimmer rate and depth
+    // both scale with motionEnergy, so it's a very slow, shallow shimmer
+    // when still and a faster, deeper one while the hexa's being moved
+    uint8_t rimShimmerRate = 2 + (uint8_t)(motionEnergy * 28);
+    uint8_t rimShimmerDepth = 18 + (uint8_t)(motionEnergy * 60);
     for (int i = 0; i < (int)glassPixels.size(); ++i) {
       PixelIndex px = glassPixels[i];
-      uint8_t shimmer = beatsin8(2, 0, 18, 0, i * 23);
+      uint8_t shimmer = beatsin8(rimShimmerRate, 0, rimShimmerDepth, 0, i * 23);
       uint8_t v = qadd8(228, shimmer);
       v = qadd8(v, (uint8_t)(motionEnergy * 20));
       ctx.leds[px] = CHSV(150, 45, v);
