@@ -4,8 +4,8 @@ A local, zero-install browser tool for editing a [motionhexa](https://www.tindie
 
 > This repository's descriptions and day-to-day upkeep are managed collaboratively with [Claude](https://claude.com) (Anthropic).
 
-<img src="doc/assets/console_programs.png" alt="Config Tool: Programs tab, showing the drag-to-reorder pattern list with live thumbnails" width="49%">
-<img src="doc/assets/console_forge.png" alt="Config Tool: Fonts &amp; Elements tab, the pixel font editor" width="49%">
+<img src="doc/assets/console_programs.png" alt="Config Tool: Programs tab, showing the drag-to-reorder pattern list with live thumbnails" width="700"><br>
+<img src="doc/assets/console_forge.png" alt="Config Tool: Fonts &amp; Elements tab, the pixel font editor" width="700">
 
 ## What it does
 
