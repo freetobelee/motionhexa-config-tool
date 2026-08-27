@@ -346,6 +346,7 @@ const uint8_t kFont_XS_COMMA[8] = { 0x00, 0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x
 const uint8_t kFont_XS_DASH[8] = { 0x00, 0x20, 0x20, 0x40, 0x80, 0x80, 0x00, 0x00 }; // '-'
 const uint8_t kFont_XS_PERIOD[8] = { 0x00, 0x00, 0x81, 0x01, 0x00, 0x00, 0x00, 0x00 }; // '.'
 const uint8_t kFont_XS_SLASH[8] = { 0x00, 0x82, 0x40, 0x40, 0x40, 0x20, 0x08, 0x00 }; // '/'
+const uint8_t kFont_XS_BACKSLASH[8] = { 0x00, 0x00, 0x44, 0xF0, 0x41, 0x04, 0x00, 0x00 }; // '\\'
 const uint8_t kFont_XS_COLON[8] = { 0x00, 0x00, 0x80, 0x00, 0x20, 0x00, 0x00, 0x00 }; // ':'
 const uint8_t kFont_XS_SEMI[8] = { 0x00, 0x00, 0x81, 0x00, 0x20, 0x00, 0x00, 0x00 }; // ';'
 const uint8_t kFont_XS_EQUALS[8] = { 0x80, 0x50, 0x50, 0xA0, 0x40, 0x41, 0x21, 0x00 }; // '='
@@ -402,7 +403,8 @@ const uint8_t *hexBitmaskGlyphForChar(char c) {
     case '!': return kFont_XS_BANG; case '&': return kFont_XS_AMP; case '\'': return kFont_XS_APOS;
     case '(': return kFont_XS_LPAREN; case ')': return kFont_XS_RPAREN; case '+': return kFont_XS_PLUS;
     case ',': return kFont_XS_COMMA; case '-': return kFont_XS_DASH; case '.': return kFont_XS_PERIOD;
-    case '/': return kFont_XS_SLASH; case ':': return kFont_XS_COLON; case ';': return kFont_XS_SEMI;
+    case '/': return kFont_XS_SLASH; case '\\': return kFont_XS_BACKSLASH;
+    case ':': return kFont_XS_COLON; case ';': return kFont_XS_SEMI;
     case '=': return kFont_XS_EQUALS;
     // kFont_XS_DEGREE exists but has no case here -- '°' isn't representable
     // as a single ASCII char, so it's not reachable through this char-keyed switch
@@ -479,6 +481,7 @@ const uint8_t kFont_MD_COMMA[16] = { 0x00, 0x00, 0x00, 0x80, 0x01, 0x06, 0x20, 0
 const uint8_t kFont_MD_DASH[16] = { 0x00, 0x00, 0x02, 0x08, 0x40, 0x00, 0x04, 0x80, 0x00, 0x10, 0x00, 0x01, 0x08, 0x20, 0x00, 0x00 }; // '-'
 const uint8_t kFont_MD_PERIOD[16] = { 0x00, 0x00, 0x00, 0x80, 0x01, 0x0E, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '.'
 const uint8_t kFont_MD_SLASH[16] = { 0x00, 0x20, 0x60, 0x40, 0x00, 0x01, 0x18, 0x80, 0x00, 0x08, 0xC0, 0x00, 0x01, 0x02, 0x02, 0x00 }; // '/'
+const uint8_t kFont_MD_BACKSLASH[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x58, 0xDC, 0x1D, 0x0D, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '\\'
 const uint8_t kFont_MD_COLON[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x20, 0x00, 0x00, 0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00 }; // ':'
 const uint8_t kFont_MD_SEMI[16] = { 0x00, 0x00, 0x00, 0x80, 0x01, 0x06, 0x20, 0x00, 0x00, 0x02, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00 }; // ';'
 const uint8_t kFont_MD_EQUALS[16] = { 0x00, 0x04, 0x0C, 0x36, 0xB0, 0x01, 0x1B, 0x60, 0x03, 0x6C, 0xC0, 0x06, 0x36, 0x18, 0x10, 0x00 }; // '='
@@ -566,6 +569,7 @@ const uint8_t kFont_LG_COMMA[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0
 const uint8_t kFont_LG_DASH[34] = { 0x00, 0x00, 0x00, 0x01, 0x38, 0x00, 0x0E, 0x00, 0x07, 0x00, 0x07, 0x00, 0x0E, 0x00, 0x38, 0x00, 0xC0, 0x01, 0x00, 0x0E, 0x00, 0x38, 0x00, 0x70, 0x00, 0x70, 0x00, 0x38, 0x00, 0x0E, 0x40, 0x00, 0x00, 0x00 }; // '-'
 const uint8_t kFont_LG_PERIOD[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x01, 0xE0, 0x01, 0xE0, 0x01, 0x80, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '.'
 const uint8_t kFont_LG_SLASH[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x0E, 0xC0, 0x01, 0x70, 0x00, 0x38, 0x00, 0x38, 0x00, 0x50, 0x00, 0x40, 0x01, 0x00, 0x05, 0x00, 0x0A, 0x00, 0x0A, 0x00, 0x05, 0x40, 0x01, 0x38, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '/'
+const uint8_t kFont_LG_BACKSLASH[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x08, 0x70, 0xF0, 0xF0, 0x47, 0xE6, 0x33, 0xF1, 0x87, 0x07, 0x07, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // '\\'
 const uint8_t kFont_LG_COLON[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xC0, 0x01, 0xE0, 0x01, 0xC0, 0x01, 0x00, 0x00, 0x38, 0x00, 0xE0, 0x01, 0xC0, 0x03, 0x80, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // ':'
 const uint8_t kFont_LG_SEMI[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x20, 0x01, 0xB0, 0x00, 0xF0, 0x00, 0xC0, 0x01, 0x38, 0x00, 0xE0, 0x01, 0xC0, 0x03, 0x80, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // ';'
 const uint8_t kFont_LG_EQUALS[34] = { 0x00, 0xC0, 0x00, 0x0A, 0x40, 0x81, 0x71, 0xA0, 0x38, 0xA0, 0x38, 0xC0, 0x71, 0x00, 0xC7, 0x01, 0x38, 0x0E, 0xC0, 0x71, 0x00, 0xC7, 0x01, 0x8E, 0x03, 0x8E, 0x03, 0xC7, 0xC0, 0x01, 0x38, 0x80, 0x01, 0x00 }; // '='
@@ -3176,7 +3180,7 @@ public:
 // center using the medium digit font), 2 = Pie Fill (a clock-style wedge
 // sweeps out from the top proportional to charge, filled with a slowly
 // animating color gradient)
-const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill")
+const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
 
 class ChargingPattern : public Pattern {
 public:
@@ -3220,6 +3224,23 @@ public:
     drawHexBitmaskSteps(ctx, hexBitmaskDigitMD(ones), kHexCellQR_MD, 127, kOverlapOffset, 0, 0, color);
   }
 
+  void drawOriginalRing(int displaySOC, int SOC, long animationMillis, int ringAnimateTime) {
+    HexaShells shells;
+    auto outerShell = shells.shells.back();
+    const int minHue = 0;
+    const int maxHue = 0x66;
+    const PixelIndex firstIdx = 14; // start near usb port
+    const int displayLength = displaySOC * outerShell.size() / 100;
+    uint8_t hue = maxHue * SOC / 100 - minHue;
+    CRGB color = CHSV(hue, 0xFF, 0xAF);
+    for (int i = 0; i < displayLength; ++i) {
+      ctx.leds[outerShell[(i + firstIdx) % outerShell.size()].value()] = color.scale8(0x50 + 0x9F * i / max(1, displayLength));
+    }
+    if (animationMillis > ringAnimateTime && displayLength < outerShell.size()) {
+      ctx.leds[outerShell[(displayLength + firstIdx) % outerShell.size()].value()] = color.scale8(beatsin8(30));
+    }
+  }
+
   void drawPieFill(int displaySOC) {
     const float startAngle = -HALF_PI; // 12 o'clock
     const float sweep = 2.0f * PI * displaySOC / 100.0f;
@@ -3258,6 +3279,8 @@ public:
       drawPercentage(displaySOC);
     } else if (kChargeIndicatorStyle == 2) {
       drawPieFill(displaySOC);
+    } else if (kChargeIndicatorStyle == 3) {
+      drawOriginalRing(displaySOC, SOC, animationMillis, ringAnimateTime);
     } else {
       drawGradientFill(displaySOC, animationMillis, ringAnimateTime);
     }
@@ -5469,6 +5492,57 @@ public:
 
   const char *description() {
     return "Hourglass";
+  }
+};
+
+// A font/glyph test card: the full character set the Small-size hex font
+// actually supports, scrolling past on loop. Exists to eyeball every glyph
+// (including whatever's been hand-customized in the Forge tool) at a
+// readable pace, not as a showpiece pattern.
+class ScrollingFontTest : public Pattern { // @thumbnail("#FF3B30", "#FFCC00", "#34C759", "#5AC8FA")
+public:
+  float scrollQ = 0;
+  vector32 smoothAcc;
+
+  void update() {
+    ctx.leds.fill_solid(CRGB::Black);
+
+    // every letter, digit, and every punctuation glyph hexBitmaskGlyphForChar
+    // actually has a case for -- this string doubles as a "did I forget to
+    // wire up a symbol" check
+    static const char text[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ   abcdefghijklmnopqrstuvwxyz   1234567890   "
+      ".,:;!?-+=/\\()&'   The quick brown fox jumps over the lazy dog.        ";
+    const int wordLen = sizeof(text) - 1;
+    const float kLoopGap = 24.0f; // blank run between the tail and the next lap
+    float totalWidth = bitmaskWordWidth(text, wordLen) + kLoopGap;
+
+    // in-plane acceleration (perpendicular to whichever axis is currently
+    // reading gravity) drives scroll speed -- resting flat scrolls at the
+    // base rate, tilting the hexa off flat ramps it up fast, and shaking it
+    // ramps it up further still. Independent of the color fade below.
+    ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
+    vector32 acc(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
+    smoothAcc = (6 * smoothAcc + acc) / 7;
+    const float accScale = (MotionManager::manager().enableDMP ? 1000.0f : 2000.0f);
+    float tiltMag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y) / accScale;
+
+    const float kBaseQPerSec = 7.0f;
+    const float kTiltGain = 12.0f;
+    float speedMultiplier = 1.0f + min(tiltMag, 2.5f) * kTiltGain;
+    scrollQ += kBaseQPerSec * speedMultiplier * frameTime() / 1000.0f;
+    scrollQ = fmodf(scrollQ, totalWidth);
+
+    // hue fade runs off the wall clock, not scrollQ, so it stays a steady,
+    // pleasant cycle no matter how fast tilt is driving the scroll
+    CRGB color = CHSV((uint8_t)(millis() / 32), 0xFF, 0xFF);
+
+    drawBitmaskWordAt(ctx, text, wordLen, -scrollQ, 0, 0, color);
+    drawBitmaskWordAt(ctx, text, wordLen, -scrollQ + totalWidth, 0, 0, color);
+  }
+
+  const char *description() {
+    return "ScrollingFontTest";
   }
 };
 

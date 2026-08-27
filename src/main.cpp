@@ -336,6 +336,7 @@ void setup() {
   // DecisionMaker (see patterns.h) is left defined but unregistered for now.
   // Breakout (see patterns.h) is left defined but unregistered for now.
   patternManager.registerPattern<Hourglass>();
+  patternManager.registerPattern<ScrollingFontTest>();
 
 #if HARDWARE_VERSION >= 3
   patternManager.registerPattern<ChargingPattern>(1);

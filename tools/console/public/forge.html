@@ -179,7 +179,6 @@
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
     padding: 4px 18px 18px; flex-wrap: wrap;
   }
-  .hint { font-size: 12.5px; color: var(--text-faint); }
   .count-readout { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); }
   .count-readout b { color: var(--accent-lit); font-weight: 600; }
 
@@ -293,14 +292,7 @@
   .dirty-dot.show { display: inline-block; }
   @keyframes dirty-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-  /* small corner mark on a character button that differs from its
-     auto-generated draft -- "you've actually worked on this one" */
   .char-btn { position: relative; }
-  .char-btn.customized::after {
-    content: ""; position: absolute; top: 2px; right: 2px;
-    width: 4px; height: 4px; border-radius: 50%; background: var(--accent-ui);
-  }
-  .char-btn.active.customized::after { background: #1a1305; }
 
   /* sticky toolbar: character/size switching stays reachable without
      scrolling back up on a tall, narrow viewport */
@@ -331,7 +323,7 @@
 <div class="shell">
 
   <header class="top">
-    <div class="brand"><span class="mark">HEXA</span><h1>Object Forge</h1></div>
+    <div class="brand"><span class="mark">MOTIONHEXA</span><h1>Config Tool</h1></div>
     <div class="header-actions">
       <nav class="nav-tabs">
         <a class="nav-tab" href="/">Programs</a>
@@ -351,8 +343,8 @@
   </header>
 
   <div class="mode-tabs">
-    <button class="mode-tab active" id="modeElementsBtn">Elements</button>
-    <button class="mode-tab" id="modeFontBtn">Font</button>
+    <button class="mode-tab active" id="modeFontBtn">Font</button>
+    <button class="mode-tab" id="modeElementsBtn">Elements</button>
   </div>
 
   <div class="layout">
@@ -374,9 +366,6 @@
         <div class="status-line" id="fontStatusLine"></div>
       </div>
 
-      <!-- character grid -->
-      <div class="char-grid" id="charGrid" style="display:none;"></div>
-
       <div class="canvas-wrap">
         <svg id="hexEditor" viewBox="0 0 620 548" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -392,6 +381,9 @@
       <div class="canvas-foot">
         <span class="count-readout"><b id="litCount">0</b> / <span id="activeTotal">271</span> lit</span>
       </div>
+
+      <!-- character grid -->
+      <div class="char-grid" id="charGrid" style="display:none;"></div>
 
       <!-- Elements toolbar -->
       <div class="toolbar" id="elementsToolbar" style="display:none;">
@@ -420,7 +412,7 @@
             <dt>Character</dt><dd id="infoChar">A</dd>
             <dt>Size</dt><dd id="infoSize">Small (61 px)</dd>
             <dt>Lit pixels</dt><dd id="infoCount">0</dd>
-            <dt>Charset</dt><dd>78 characters × 3 sizes, auto-populated</dd>
+            <dt>Charset</dt><dd>79 characters × 3 sizes, auto-populated</dd>
           </dl>
         </div>
       </section>
@@ -582,6 +574,7 @@
     "+": [".....","..X..","..X..","XXXXX","..X..","..X..","....."],
     "=": [".....",".....","XXXXX",".....","XXXXX",".....","....."],
     "/": ["....X","...X.","..X..","..X..","..X..",".X...","X...."],
+    "\\": ["X....",".X...","..X..","..X..","..X..","...X.","....X"],
     "(": ["...X.","..X..",".X...",".X...",".X...","..X..","...X."],
     ")": [".X...","..X..","...X.","...X.","...X.","..X..",".X..."],
     "°": [".XX..","X..X.",".XX..",".....",".....",".....","....."],
@@ -601,6 +594,7 @@
     { ch: "+", id: "PLUS", label: "+" },
     { ch: "=", id: "EQUALS", label: "=" },
     { ch: "/", id: "SLASH", label: "/" },
+    { ch: "\\", id: "BACKSLASH", label: "\\" },
     { ch: "(", id: "LPAREN", label: "(" },
     { ch: ")", id: "RPAREN", label: ")" },
     { ch: "°", id: "DEGREE", label: "°" },
@@ -995,7 +989,6 @@
         A.pushUndo();
         data.font[state.sizeKey][state.ch] = newFontPairs;
         A.bumpVersion();
-        updateCharGridCustomizedMarks();
       }
       var label = state.ch === " " ? "space" : "‘" + state.ch + "’";
       flash(fontStatusLine, "Saved " + label + " (" + SIZES[state.sizeKey].label + ", " + onCells.size + " px).", "ok");
@@ -1033,7 +1026,6 @@
       A.loadCellsIntoCanvas(data.font[state.sizeKey][state.ch]);
       updateSizeTabHighlight();
       updateCharGridHighlight();
-      updateCharGridCustomizedMarks();
       updateFontInfo();
     }
     refreshModeChrome();
@@ -1065,30 +1057,12 @@
     A.applyActiveRadius(SIZES[sizeKey].radius);
     A.loadCellsIntoCanvas(data.font[sizeKey][state.ch]);
     updateSizeTabHighlight();
-    updateCharGridCustomizedMarks();
     updateFontInfo();
   }
 
   function updateCharGridHighlight() {
     document.querySelectorAll(".char-btn").forEach(function (b) {
       b.classList.toggle("active", b.dataset.ch === state.ch);
-    });
-  }
-  function isCustomized(ch, sizeKey) {
-    var current = data.font[sizeKey][ch];
-    if (!current) return false;
-    var def = A.cellsToPairs(A.sampleDefaultGlyph(ch, sizeKey));
-    if (current.length !== def.length) return true;
-    var curSet = {};
-    current.forEach(function (p) { curSet[p[0] + "," + p[1]] = true; });
-    for (var i = 0; i < def.length; i++) {
-      if (!curSet[def[i][0] + "," + def[i][1]]) return true;
-    }
-    return false;
-  }
-  function updateCharGridCustomizedMarks() {
-    document.querySelectorAll(".char-btn").forEach(function (b) {
-      b.classList.toggle("customized", isCustomized(b.dataset.ch, state.sizeKey));
     });
   }
   function updateSizeTabHighlight() {
@@ -1251,7 +1225,6 @@
       updateFontInfo();
       flash(fontStatusLine, "Undone.", "ok");
     }
-    updateCharGridCustomizedMarks();
   }
 
   if (undoBtn) undoBtn.addEventListener("click", doUndo);
@@ -1267,7 +1240,6 @@
   window.__hexaForgeUI = {
     commitCurrent: commitCurrent, renderLibrary: renderLibrary, renderCharGrid: renderCharGrid,
     updateCharGridHighlight: updateCharGridHighlight, updateSizeTabHighlight: updateSizeTabHighlight,
-    updateCharGridCustomizedMarks: updateCharGridCustomizedMarks,
     updateFontInfo: updateFontInfo, refreshModeChrome: refreshModeChrome, flash: flash,
     statusLine: statusLine
   };
@@ -1340,7 +1312,6 @@
   A.autoPopulate();
   window.__hexaForgeUI.renderCharGrid();
   window.__hexaForgeUI.renderLibrary();
-  window.__hexaForgeUI.updateCharGridCustomizedMarks();
   window.__hexaForgeUI.updateCharGridHighlight();
   window.__hexaForgeUI.updateSizeTabHighlight();
   window.__hexaForgeUI.updateFontInfo();
@@ -1354,7 +1325,6 @@
     if (libTag) libTag.textContent = "v" + (data.libVersion || 0);
     A.autoPopulate();
     window.__hexaForgeUI.renderLibrary();
-    window.__hexaForgeUI.updateCharGridCustomizedMarks();
     if (A.state.mode === "elements") {
       A.loadCellsIntoCanvas(A.state.elementName ? data.elements[A.state.elementName] : []);
     } else {
