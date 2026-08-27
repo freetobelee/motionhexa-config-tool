@@ -147,7 +147,7 @@
   .size-tab.active .n { color: var(--accent-ui-dim); }
 
   /* ---- character grid (font mode) ---- */
-  .char-grid { display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--border-soft); }
+  .char-grid { display: flex; flex-direction: column; gap: 8px; }
   .char-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .char-row .row-label {
     font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); width: 34px; flex: 0 0 auto;
@@ -365,9 +365,6 @@
         <div class="status-line" id="fontStatusLine"></div>
       </div>
 
-      <!-- character grid -->
-      <div class="char-grid" id="charGrid" style="display:none;"></div>
-
       <div class="canvas-wrap">
         <svg id="hexEditor" viewBox="0 0 620 548" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -383,6 +380,18 @@
       <div class="canvas-foot">
         <span class="count-readout"><b id="litCount">0</b> / <span id="activeTotal">271</span> lit</span>
       </div>
+
+      <section class="panel" id="fontInfoPanel" style="display:none;">
+        <div class="panel-head"><h2>Current Glyph</h2></div>
+        <div class="panel-body">
+          <dl class="info-grid">
+            <dt>Character</dt><dd id="infoChar">A</dd>
+            <dt>Size</dt><dd id="infoSize">Small (61 px)</dd>
+            <dt>Lit pixels</dt><dd id="infoCount">0</dd>
+            <dt>Charset</dt><dd>80 characters × 3 sizes, auto-populated</dd>
+          </dl>
+        </div>
+      </section>
 
       <!-- Elements toolbar -->
       <div class="toolbar" id="elementsToolbar" style="display:none;">
@@ -404,15 +413,10 @@
         <div class="panel-body"><div class="library-list-wrap"><div class="library-list" id="libraryList"></div></div></div>
       </section>
 
-      <section class="panel" id="fontInfoPanel" style="display:none;">
-        <div class="panel-head"><h2>Current Glyph</h2></div>
+      <section class="panel" id="charGridPanel">
+        <div class="panel-head"><h2>Characters</h2></div>
         <div class="panel-body">
-          <dl class="info-grid">
-            <dt>Character</dt><dd id="infoChar">A</dd>
-            <dt>Size</dt><dd id="infoSize">Small (61 px)</dd>
-            <dt>Lit pixels</dt><dd id="infoCount">0</dd>
-            <dt>Charset</dt><dd>80 characters × 3 sizes, auto-populated</dd>
-          </dl>
+          <div class="char-grid" id="charGrid"></div>
         </div>
       </section>
 
@@ -1008,7 +1012,7 @@
     document.getElementById("modeFontBtn").classList.toggle("active", !isElements);
     document.getElementById("elementsToolbar").style.display = isElements ? "" : "none";
     document.getElementById("fontToolbar").style.display = isElements ? "none" : "";
-    document.getElementById("charGrid").style.display = isElements ? "none" : "";
+    document.getElementById("charGridPanel").style.display = isElements ? "none" : "";
     document.getElementById("libraryPanel").style.display = isElements ? "" : "none";
     document.getElementById("fontInfoPanel").style.display = isElements ? "none" : "";
   }
