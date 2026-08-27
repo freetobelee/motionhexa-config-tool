@@ -417,29 +417,20 @@ DEFINE_HEXBITMASK_LOOKUP(hexBitmaskGlyphForChar, XS)
 // MD/LG instantiations live further down, after their kFont_MD_*/kFont_LG_*
 // constants are actually declared (this macro is still in scope until #undef)
 
-// size-generic word width/draw -- same zero-gap kerning rule as the XS-only
-// helpers below, parameterized by glyph lookup + cell table so callers can
-// scroll the same text at any of the three font sizes
-float bitmaskWordWidthAtSize(const char *word, int wordLen, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount) {
-  float w = 0;
-  for (int i = 0; i < wordLen; ++i) {
-    if (word[i] == ' ') { w += 3.0f; continue; }
-    int minQ, maxQ;
-    hexBitmaskQBounds(glyphFn(word[i]), cellQR, cellCount, minQ, maxQ);
-    w += (maxQ - minQ);
-  }
-  return w;
+// size-generic word width/draw -- no kerning at all, every character
+// (including space) advances by the same fixed pitch, placed directly one
+// after the other; parameterized by glyph lookup + cell table so callers
+// can scroll the same text at any of the three font sizes
+float bitmaskWordWidthAtSize(int wordLen, float pitch) {
+  return wordLen * pitch;
 }
-void drawBitmaskWordAtSize(PixelStorage<LED_COUNT> &ctx, const char *word, int wordLen, float startQ, int startR, int rotSteps, CRGB color, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount) {
+void drawBitmaskWordAtSize(PixelStorage<LED_COUNT> &ctx, const char *word, int wordLen, float startQ, int startR, int rotSteps, CRGB color, const uint8_t *(*glyphFn)(char), const int8_t cellQR[][2], int cellCount, float pitch) {
   float cursor = startQ;
   for (int i = 0; i < wordLen; ++i) {
-    if (word[i] == ' ') { cursor += 3.0f; continue; }
-    const uint8_t *mask = glyphFn(word[i]);
-    int minQ, maxQ;
-    hexBitmaskQBounds(mask, cellQR, cellCount, minQ, maxQ);
-    int origin = (int)roundf(cursor - minQ);
-    drawHexBitmaskSteps(ctx, mask, cellQR, cellCount, origin, startR, rotSteps, color);
-    cursor += (maxQ - minQ);
+    if (word[i] != ' ') {
+      drawHexBitmaskSteps(ctx, glyphFn(word[i]), cellQR, cellCount, (int)roundf(cursor), startR, rotSteps, color);
+    }
+    cursor += pitch;
   }
 }
 
@@ -5560,23 +5551,20 @@ public:
   vector32 smoothAcc;
 
   // tilt front/back (same az/mag convention RickRoll's playback-speed tilt
-  // uses) maps to a signed speed multiplier: flat = normal forward, tilt
-  // forward = speeds up forward, tilt backward = slows to a stop and then
-  // reverses -- one control drives both scroll and the glyph-flip phase
+  // uses) maps to a signed speed multiplier: flat = normal forward. Linear
+  // and aggressive on purpose -- tilting ~15% toward the scroll direction
+  // should already read as "a lot faster", and tilting against it should
+  // already be slowing to a stop and reversing, not waiting for a big tilt.
   float tiltDirMultiplier() {
     ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
     vector32 acc(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
     smoothAcc = (6 * smoothAcc + acc) / 7;
     float mag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y + (float)smoothAcc.z * smoothAcc.z);
-    const float kDeadzone = 0.15f;
-    const float kMaxForward = 6.0f;
-    const float kMaxBackward = 4.0f;
+    const float kDeadzone = 0.03f;
+    const float kGain = 25.0f;
     float tiltFrontBack = (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0;
-    float absTilt = fabsf(tiltFrontBack);
-    if (absTilt <= kDeadzone) return 1.0f;
-    float t = (absTilt - kDeadzone) / (1.0f - kDeadzone);
-    float eased = t * t;
-    return (tiltFrontBack > 0) ? (1.0f + eased * (kMaxForward - 1.0f)) : (-eased * kMaxBackward);
+    if (fabsf(tiltFrontBack) <= kDeadzone) return 1.0f;
+    return 1.0f + tiltFrontBack * kGain;
   }
 
   void update() {
@@ -5590,16 +5578,16 @@ public:
       const uint8_t *(*glyphFn)(char);
       const int8_t (*cellQR)[2];
       int cellCount;
-      float qPerSec;
+      float qPerSec, pitch;
       switch (phase) {
-        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 3.0f; break;
-        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 4.5f; break;
-        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; break;
+        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 3.0f; pitch = 6.0f;  break;
+        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 4.5f; pitch = 9.0f;  break;
+        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; pitch = 14.0f; break;
       }
       const char *word = text();
       int wordLen = strLen(word);
       const float kLoopGap = 24.0f; // blank run between the tail and the next lap
-      float totalWidth = bitmaskWordWidthAtSize(word, wordLen, glyphFn, cellQR, cellCount) + kLoopGap;
+      float totalWidth = bitmaskWordWidthAtSize(wordLen, pitch) + kLoopGap;
 
       scrollQ += qPerSec * dirMult * frameTime() / 1000.0f;
       if (scrollQ >= totalWidth) {
@@ -5610,8 +5598,8 @@ public:
         scrollQ += totalWidth; // loop backward within this size rather than stepping back a phase
       }
 
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount);
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount, pitch);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount, pitch);
     } else {
       // finale: flip through every glyph one at a time, centered and large
       const char *chars = flipChars();
