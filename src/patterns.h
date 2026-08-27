@@ -3265,14 +3265,61 @@ public:
     }
   }
 
+  // orientation: which of the 6 edges is currently resting down, so digits
+  // and the % sign read upright no matter which face is on the table -- same
+  // in-plane-gravity-angle technique RickRoll's face lock uses
+  int percentRotationSteps = 0;
+  void updatePercentRotation() {
+    ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
+    float ax = agmt.acc.axes.x, ay = agmt.acc.axes.y, az = agmt.acc.axes.z;
+    float mag = sqrtf(ax * ax + ay * ay + az * az);
+    float inPlaneMag = sqrtf(ax * ax + ay * ay);
+    if (mag > 1 && inPlaneMag / mag > 0.6f) {
+      float delta = atan2f(ay, ax) + (float)M_PI / 2.0f;
+      int steps = ((int)roundf(delta / (float)(M_PI / 3.0))) % 6;
+      if (steps < 0) steps += 6;
+      percentRotationSteps = steps;
+    }
+  }
+
+  // loops: two Large digits and a Large '%' shown one at a time, a blank
+  // beat, then a compact Small two-digit summary before repeating
+  int percentPhase = 0;
+  unsigned long percentPhaseStartMs = 0;
   void drawPercentage(int displaySOC) {
-    uint8_t huePhase = (millis() / 60) & 0xFF;
+    updatePercentRotation();
+    unsigned long nowMs = millis();
+    uint8_t huePhase = (nowMs / 60) & 0xFF;
     CRGB color = CHSV(huePhase, 0x90, 0xE0);
-    const int kOverlapOffset = 3;
     int value = min(99, displaySOC); // two digits only; 100% reads as "99" here
     int tens = (value / 10) % 10, ones = value % 10;
-    drawHexBitmaskSteps(ctx, hexBitmaskDigitMD(tens), kHexCellQR_MD, 127, -kOverlapOffset, 0, 0, color);
-    drawHexBitmaskSteps(ctx, hexBitmaskDigitMD(ones), kHexCellQR_MD, 127, kOverlapOffset, 0, 0, color);
+
+    const unsigned long kGlyphMs = 550, kBlankMs = 250, kSmallMs = 1600;
+    unsigned long phaseDur = (percentPhase == 3) ? kBlankMs : (percentPhase == 4) ? kSmallMs : kGlyphMs;
+    if (nowMs - percentPhaseStartMs > phaseDur) {
+      percentPhaseStartMs = nowMs;
+      percentPhase = (percentPhase + 1) % 5;
+    }
+
+    switch (percentPhase) {
+      case 0:
+        drawHexBitmaskSteps(ctx, hexBitmaskDigitLG(tens), kHexCellQR_LG, 271, 0, 0, percentRotationSteps, color);
+        break;
+      case 1:
+        drawHexBitmaskSteps(ctx, hexBitmaskDigitLG(ones), kHexCellQR_LG, 271, 0, 0, percentRotationSteps, color);
+        break;
+      case 2:
+        drawHexBitmaskSteps(ctx, hexBitmaskGlyphForCharLG('%'), kHexCellQR_LG, 271, 0, 0, percentRotationSteps, color);
+        break;
+      case 3:
+        break; // blank beat between the big cycle and the small summary
+      default: {
+        const int kOverlapOffset = 2;
+        drawHexBitmaskSteps(ctx, hexBitmaskDigitXS(tens), kHexCellQR_XS, 61, -kOverlapOffset, 0, percentRotationSteps, color);
+        drawHexBitmaskSteps(ctx, hexBitmaskDigitXS(ones), kHexCellQR_XS, 61, kOverlapOffset, 0, percentRotationSteps, color);
+        break;
+      }
+    }
   }
 
   void drawOriginalRing(int displaySOC, int SOC, long animationMillis, int ringAnimateTime) {
@@ -5340,6 +5387,7 @@ class Hourglass : public Pattern { // @thumbnail("#FFDC8C", "#FFB414", "#40FFB4"
 
   std::vector<PixelIndex> glassPixels;
   std::vector<PixelIndex> haloPixels; // one ring of neighbors around the glass, for a soft glow
+  bool isHaloPixel[LED_COUNT] = { false }; // fast membership test so sand can draw over the glow
 
   vector32 smoothAcc;
   float motionEnergy = 0;
@@ -5399,6 +5447,7 @@ class Hourglass : public Pattern { // @thumbnail("#FFDC8C", "#FFB414", "#40FFB4"
         if (isRim[npx] || added[npx]) continue;
         added[npx] = true;
         haloPixels.push_back(npx);
+        isHaloPixel[npx] = true;
       }
     }
   }
@@ -5484,14 +5533,32 @@ public:
     float surfaceB = pileAtFarB ? -kChamberHeight * (1 - fB) : -fB * kChamberHeight;
     float slant = tiltX * 0.6f;
 
-    // one shared ambient field for the whole scene (see ambientHueAt/BriAt) --
-    // the frosted interior reads a touch brighter than the sky outside, as if
-    // the glass itself is catching that same light, not a separate palette
+    // "up" direction in display-rect space is just the opposite of gravity's
+    // in-plane component (same (ax,ay) convention AnalogClock/SolarSystem/
+    // RickRoll rely on) -- both the glow and the rim sample how aligned their
+    // own position is with that direction, so the bright side of each always
+    // faces up in the real world and visibly slides as the hexa tilts
+    float upX = -tiltX, upY = -tiltY;
+    const float kGradientRadius = 7.5f;
+
+    // soft glow bleeding off the rim, drawn first so sand (below) can cover
+    // it where the two overlap -- brightness is an up-facing gradient, plus
+    // a motionEnergy boost so shaking the hexa still visibly livens it up
+    for (PixelIndex px : haloPixels) {
+      vectorf r = axial.rectFromPixelIndex(px);
+      float upAlign = constrain((r.x * upX + r.y * upY) / kGradientRadius, -1.0f, 1.0f);
+      uint8_t v = (uint8_t)(12 + 55 * (0.5f + 0.5f * upAlign));
+      v = qadd8(v, (uint8_t)(motionEnergy * 30));
+      ctx.leds[px] = CHSV(150, 75, v);
+    }
+
+    // one shared ambient field for the whole scene (see ambientHueAt/BriAt).
+    // Empty chamber space and the sky both leave halo pixels alone (so the
+    // glow drawn above stays visible there) -- only actual sand is allowed
+    // to draw over the glow, so the fill always reads as filling the whole
+    // glass rather than stopping short at a visible glow ring near the rim.
     for (PixelIndex px = 0; px < LED_COUNT; ++px) {
       vectorf r = axial.rectFromPixelIndex(px);
-      uint8_t bgHue = ambientHueAt(r.x, r.y, nowMs);
-      uint8_t bgBri = ambientBriAt(r.x, r.y, nowMs);
-      CRGB c;
       if (insideChamber(r.x, r.y)) {
         bool topChamber = r.y >= 0;
         float slantedY = r.y - slant * (r.x / kBaseHalfWidth);
@@ -5502,26 +5569,15 @@ public:
           uint8_t hueJitter = (px * 47) % 11;
           uint8_t sparkle = sin8(px * 13 + nowMs / 90);
           uint8_t v = 180 + sparkle / 14;
-          c = CHSV(28 + hueJitter, 235, v);
-        } else {
-          c = CRGB::Black; // empty chamber space -- no interior glow, just the sand and the rim
+          ctx.leds[px] = CHSV(28 + hueJitter, 235, v);
+        } else if (!isHaloPixel[px]) {
+          ctx.leds[px] = CRGB::Black; // empty chamber space -- no interior glow, just the sand and the rim
         }
-      } else {
-        c = CHSV(bgHue, 205, bgBri);
+      } else if (!isHaloPixel[px]) {
+        uint8_t bgHue = ambientHueAt(r.x, r.y, nowMs);
+        uint8_t bgBri = ambientBriAt(r.x, r.y, nowMs);
+        ctx.leds[px] = CHSV(bgHue, 205, bgBri);
       }
-      ctx.leds[px] = c;
-    }
-
-    // soft glow bleeding off the rim -- drawn before the rim itself so the
-    // rim always reads crisp and bright on top of it. Pulse rate and range
-    // both scale with motionEnergy: calm slow breathing at rest, faster and
-    // wider swings the more the hexa's being moved.
-    uint8_t glowRate = 4 + (uint8_t)(motionEnergy * 22);
-    uint8_t glowMax = 50 + (uint8_t)(motionEnergy * 130);
-    uint8_t glowPulse = beatsin8(glowRate, 18, glowMax);
-    CRGB glowColor = CHSV(150, 75, glowPulse);
-    for (PixelIndex px : haloPixels) {
-      ctx.leds[px] = glowColor;
     }
 
     for (int i = 0; i < kMaxFallingGrains; ++i) {
@@ -5533,15 +5589,14 @@ public:
       drawLocalPixel(g.x, y, CRGB(255, 220, 140));
     }
 
-    // the rim itself: steady and bright at rest -- shimmer rate and depth
-    // both scale with motionEnergy, so it's a very slow, shallow shimmer
-    // when still and a faster, deeper one while the hexa's being moved
-    uint8_t rimShimmerRate = 2 + (uint8_t)(motionEnergy * 28);
-    uint8_t rimShimmerDepth = 18 + (uint8_t)(motionEnergy * 60);
+    // the rim itself: an up-facing brightness gradient instead of a time-based
+    // shimmer -- tilt the hexa and the bright band visibly slides around the
+    // glass, plus the same motionEnergy boost for a shake-reactive brighten
     for (int i = 0; i < (int)glassPixels.size(); ++i) {
       PixelIndex px = glassPixels[i];
-      uint8_t shimmer = beatsin8(rimShimmerRate, 0, rimShimmerDepth, 0, i * 23);
-      uint8_t v = qadd8(228, shimmer);
+      vectorf r = axial.rectFromPixelIndex(px);
+      float upAlign = constrain((r.x * upX + r.y * upY) / kGradientRadius, -1.0f, 1.0f);
+      uint8_t v = (uint8_t)(150 + 105 * (0.5f + 0.5f * upAlign));
       v = qadd8(v, (uint8_t)(motionEnergy * 20));
       ctx.leds[px] = CHSV(150, 45, v);
     }
@@ -5576,74 +5631,118 @@ public:
   static int strLen(const char *s) { int n = 0; while (s[n]) n++; return n; }
 
   int phase = 0; // 0=Small scroll, 1=Medium scroll, 2=Large scroll, 3=flip through every glyph
-  float scrollQ = 0;
+  float autoQ = 0;   // monotonic baseline -- always creeps forward, drives phase advance
   float flipPos = 0;
   vector32 smoothAcc;
+  bool jumpFired = false; // one jump per tilt episode, not one per frame
 
-  // tilt front/back (same az/mag convention RickRoll's playback-speed tilt
-  // uses) maps to a signed speed multiplier: flat = normal forward. Linear
-  // and aggressive on purpose -- tilting ~15% toward the scroll direction
-  // should already read as "a lot faster", and tilting against it should
-  // already be slowing to a stop and reversing, not waiting for a big tilt.
-  float tiltDirMultiplier() {
+  // small S/M/L marker row along the top of the display -- lit interface
+  // showing (and, via a firm tilt, letting you jump directly between) the
+  // three scroll phases
+  PixelIndex markerPixels[3];
+  ScrollingFontTest() {
+    vectorf targets[3] = { vectorf(-3.0f, 8.0f), vectorf(0.0f, 8.5f), vectorf(3.0f, 8.0f) };
+    for (int m = 0; m < 3; ++m) {
+      PixelIndex best = 0;
+      float bestD = 1e9f;
+      for (PixelIndex px = 0; px < LED_COUNT; ++px) {
+        vectorf r = axial.rectFromPixelIndex(px);
+        float dx = r.x - targets[m].x, dy = r.y - targets[m].y;
+        float d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = px; }
+      }
+      markerPixels[m] = best;
+    }
+  }
+
+  // signed front/back tilt, -1..1 (same az/mag convention RickRoll's
+  // playback-speed tilt uses)
+  float tiltFrontBack() {
     ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
     vector32 acc(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
     smoothAcc = (6 * smoothAcc + acc) / 7;
     float mag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y + (float)smoothAcc.z * smoothAcc.z);
-    const float kDeadzone = 0.03f;
-    const float kGain = 25.0f;
-    float tiltFrontBack = (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0;
-    if (fabsf(tiltFrontBack) <= kDeadzone) return 1.0f;
-    return 1.0f + tiltFrontBack * kGain;
+    return (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0.0f;
   }
 
   void update() {
     ctx.leds.fill_solid(CRGB::Black);
-    float dirMult = tiltDirMultiplier();
+    float tilt = tiltFrontBack();
+    const float kDeadzone = 0.05f;
+    const float kJumpThreshold = 0.55f;
     // hue fade runs off the wall clock, not scroll/flip position, so it
-    // stays a steady, pleasant cycle no matter how fast tilt drives things
+    // stays a steady, pleasant cycle no matter what tilt is doing
     CRGB color = CHSV((uint8_t)(millis() / 32), 0xFF, 0xFF);
+
+    // a firm, held tilt jumps straight to the next/previous size (S/M/L
+    // only -- the flip finale is still reached by finishing a Large lap),
+    // one jump per tilt episode so it doesn't rapid-fire while held
+    bool strongTilt = fabsf(tilt) > kJumpThreshold;
+    if (!strongTilt) {
+      jumpFired = false;
+    } else if (!jumpFired) {
+      jumpFired = true;
+      if (phase <= 2) {
+        phase = (phase + (tilt > 0 ? 1 : -1) + 3) % 3;
+        autoQ = 0;
+      }
+    }
 
     if (phase < 3) {
       const uint8_t *(*glyphFn)(char);
       const int8_t (*cellQR)[2];
       int cellCount;
-      float qPerSec, pitch;
+      float qPerSec, pitch, scrubRange;
       bool kerned = (phase == 2); // Large keeps real per-glyph kerning; Small/Medium are fixed-pitch
       switch (phase) {
-        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 3.0f; pitch = 6.0f;  break;
-        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 4.5f; pitch = 9.0f;  break;
-        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 7.0f; pitch = 0.0f; break;
+        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 2.0f; pitch = 6.0f;  scrubRange = 48.0f; break;
+        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 3.0f; pitch = 9.0f;  scrubRange = 72.0f; break;
+        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 4.5f; pitch = 0.0f; scrubRange = 90.0f; break;
       }
       const char *word = text();
       int wordLen = strLen(word);
       const float kLoopGap = 24.0f; // blank run between the tail and the next lap
       float totalWidth = bitmaskWordWidthAtSize(word, wordLen, glyphFn, cellQR, cellCount, kerned, pitch) + kLoopGap;
 
-      scrollQ += qPerSec * dirMult * frameTime() / 1000.0f;
-      if (scrollQ >= totalWidth) {
-        scrollQ -= totalWidth;
+      // autoQ is the monotonic baseline (idle creep, always forward -- this
+      // is what advances phases on a completed lap). Tilt beyond the
+      // deadzone adds a directly-mapped offset on top for precise scrubbing:
+      // no momentum, no drift -- return to flat and the offset snaps to zero.
+      autoQ += qPerSec * frameTime() / 1000.0f;
+      if (autoQ >= totalWidth) {
+        autoQ -= totalWidth;
         phase = (phase + 1) % 4;
         if (phase == 3) flipPos = 0;
-      } else if (scrollQ < 0) {
-        scrollQ += totalWidth; // loop backward within this size rather than stepping back a phase
       }
+      float scrubOffset = (fabsf(tilt) <= kDeadzone) ? 0.0f : tilt * scrubRange;
+      float scrollQ = autoQ + scrubOffset;
+      scrollQ = fmodf(scrollQ, totalWidth);
+      if (scrollQ < 0) scrollQ += totalWidth;
 
       drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
       drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
     } else {
-      // finale: flip through every glyph one at a time, centered and large
+      // finale: flip through every glyph one at a time, centered and large;
+      // same tilt convention, but as a direct speed (not scrub) since a
+      // one-at-a-time flip has no useful "position" to scrub through
       const char *chars = flipChars();
       int nChars = strLen(chars);
       const float kCharsPerSec = 2.2f;
+      float dirMult = (fabsf(tilt) <= kDeadzone) ? 1.0f : 1.0f + tilt * 6.0f;
       flipPos += kCharsPerSec * dirMult * frameTime() / 1000.0f;
-      if (flipPos >= nChars) { flipPos -= nChars; phase = 0; scrollQ = 0; }
+      if (flipPos >= nChars) { flipPos -= nChars; phase = 0; autoQ = 0; }
       else if (flipPos < 0) { flipPos += nChars; }
 
       const uint8_t *mask = hexBitmaskGlyphForCharLG(chars[(int)flipPos]);
       int minQ, maxQ;
       hexBitmaskQBounds(mask, kHexCellQR_LG, 271, minQ, maxQ);
       drawHexBitmaskSteps(ctx, mask, kHexCellQR_LG, 271, -(minQ + maxQ) / 2, 0, 0, color);
+    }
+
+    // S/M/L marker row: the active size glows in the scroll color, the
+    // other two stay dim -- also shows where a firm tilt will jump to
+    for (int m = 0; m < 3; ++m) {
+      ctx.leds[markerPixels[m]] = (phase == m) ? color : CRGB(20, 20, 20);
     }
   }
 
