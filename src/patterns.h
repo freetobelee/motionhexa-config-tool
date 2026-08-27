@@ -1129,10 +1129,11 @@ public:
 
   // two Small digits (tens, ones) side by side, centered at local Y=centerY --
   // spacing is derived from each digit's own real ink width (via
-  // hexBitmaskQBounds) rather than a fixed gap, so it stays reasonably tight
-  // without the two ever overlapping
+  // hexBitmaskQBounds), then kerned -1px (the two digits' facing edges
+  // overlap by one pixel) -- always keep this negative for a 2-wide
+  // centered Small pair, same convention drawTwoSmallDigits uses elsewhere
   void drawTwoDigitInto(PixelStorage<LED_COUNT> &buf, int value, float centerY, CRGB color) {
-    const float kDigitGap = 1.5f; // local-X gap between the two digits' facing edges
+    const float kDigitGap = -1.0f; // local-X gap between the two digits' facing edges (negative = overlap)
     int tens = (value / 10) % 10, ones = value % 10;
     int tensMinQ, tensMaxQ, onesMinQ, onesMaxQ;
     hexBitmaskQBounds(hexBitmaskDigitXS(tens), kHexCellQR_XS, 61, tensMinQ, tensMaxQ);
