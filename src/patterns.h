@@ -641,7 +641,7 @@ const uint8_t kElement_HEART[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0
 const uint8_t kElement_RING[34] = { 0x00, 0x00, 0x00, 0x3F, 0xF8, 0x0F, 0xCF, 0xC3, 0xC1, 0x61, 0x80, 0x61, 0x00, 0xC3, 0x01, 0x0E, 0x06, 0x30, 0x38, 0xC0, 0x61, 0x00, 0xC3, 0x00, 0xC3, 0xC1, 0xE1, 0x79, 0xF8, 0x0F, 0x7E, 0x00, 0x00, 0x00 }; // ring
 const uint8_t kElement_STAR[34] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xC0, 0x80, 0x31, 0x80, 0x1F, 0x00, 0x3F, 0x00, 0xFC, 0x00, 0xE0, 0x1F, 0xC0, 0xFF, 0x80, 0x3F, 0x80, 0x3B, 0x00, 0x18, 0x00, 0x0C, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00 }; // star
 
-class PulseHexa : public Pattern, PaletteRotation<CRGBPalette256> {
+class PulseHexa : public Pattern, PaletteRotation<CRGBPalette256> { // @thumbnail("#780000", "#FF6800", "#1000A2")
 public:
   HexaShells hexaShells;
   PulseHexa() {
@@ -669,7 +669,7 @@ public:
   }
 };
 
-class PulseHexaSmooth : public Pattern, AmplitudeReceiver, PaletteRotation<CRGBPalette256> {
+class PulseHexaSmooth : public Pattern, AmplitudeReceiver, PaletteRotation<CRGBPalette256> { // @thumbnail("#010607", "#016367", "#90D1FF")
 public:
   AxialT<int32_t> center;
   PulseHexaSmooth() : AmplitudeReceiver(audioInput) {
@@ -727,7 +727,7 @@ public:
   in any case add parameters and link them to motion
 */
 // FIXME: this has a continuity issue where the animation jumps across some probably modulus overflow OH or in the accAccum??
-class MotionHexa : public Pattern, PaletteRotation<CRGBPalette256> {
+class MotionHexa : public Pattern, PaletteRotation<CRGBPalette256> { // @thumbnail("#780000", "#FF6800", "#1000A2")
 public:
   HexaShells hexaShells;
   MotionHexa() {
@@ -851,7 +851,7 @@ DEFINE_GRADIENT_PALETTE( EarthToneHands_gp ) {
 // 9 Amber:   digital HH/MM readout, warm retro all-amber-on-near-black display, TICKING amber seconds ring
 enum ClockDial { kEarthDial = 0, kGreyDial, kBlackDial, kLagoonDial, kSunsetDial, kNeonDial, kCometDial, kBladeDial, kCircuitDial, kAmberDial, kDialCount };
 
-class AnalogClock : public Pattern {
+class AnalogClock : public Pattern { // @thumbnail("#6E5032", "#DC823C", "#EBA54B", "#A5B969")
 public:
   const double kStartSeconds = 6*3600.0 + 20*60.0 + 10.0; // clock starts at 6:20:10
   const unsigned long kColorCycleMS = 90000;      // full earth-tone cycle for the Earth dial's hands, at 1x speed
@@ -1548,7 +1548,7 @@ public:
 // -- tilt is spent on scene selection (or, face down, panning the sky) once
 // you're off the flat-facing-up orientation, so it isn't also asked to
 // control speed there.
-class SolarSystem : public Pattern {
+class SolarSystem : public Pattern { // @thumbnail("#468CDC", "#D25A3C", "#DCAA6E", "#FFDC64")
 public:
   enum Scene { kSolarScene = 0, kMoonScene, kSunriseScene, kAstrologyScene, kSkyScene };
 
@@ -2392,7 +2392,7 @@ public:
 
 const int kTriBounceSpeed = 70; // @tunable("Speed", 10, 200, "TriBounce")
 
-class TriBounce : public BouncyPixels {
+class TriBounce : public BouncyPixels { // @thumbnail("#FF0000", "#80FF00", "#00FFFF", "#8000FF")
 public:
   TriBounce() : BouncyPixels(3, kTriBounceSpeed, 0xFF, 2) {
   }
@@ -2411,7 +2411,7 @@ public:
 
 const int kPixelDustCount = 60; // @tunable("Particle Count", 10, 271, "PixelDust")
 
-class PixelDust : public BouncyPixels {
+class PixelDust : public BouncyPixels { // @thumbnail("#BC8701", "#2E0701")
 public:
   PixelDust() : BouncyPixels(kPixelDustCount, 70, 0xF4) {
   }
@@ -2422,7 +2422,7 @@ public:
 
 const int kPixelSandCount = 60; // @tunable("Particle Count", 10, 271, "PixelSand")
 
-class PixelSand : public BouncyPixels {
+class PixelSand : public BouncyPixels { // @thumbnail("#B31600", "#A71612", "#640067")
 public:
   PixelSand() : BouncyPixels(kPixelSandCount, 70, 0xC0) {
   }
@@ -2442,7 +2442,7 @@ public:
 };
 
 // special case the single ball physics since we can do nice floating point math for a single particle
-class LargeBouncyBall : public Pattern {
+class LargeBouncyBall : public Pattern { // @thumbnail("#FFFFFF", "#808080", "#000000")
   struct Ball {
     vectorf pos;
     vectorf velocity;
@@ -2622,7 +2622,7 @@ public:
 
 /* ------------------------------------------------------------------------------- */
 
-class TriangleSpin : public Pattern, PaletteRotation<CRGBPalette256> {
+class TriangleSpin : public Pattern, PaletteRotation<CRGBPalette256> { // @thumbnail("#016367", "#90D1FF", "#004952")
 public:
   TriangleSpin() {
     secondsPerPalette = 20;
@@ -2704,7 +2704,7 @@ public:
 
 /* ------------------------------------------------------------------------------- */
 
-class PridefulSpinnyThing : public Pattern {
+class PridefulSpinnyThing : public Pattern { // @thumbnail("#F40303", "#FFED00", "#00C026", "#002DFF", "#7507B7")
 public:
   CRGBPalette256 palettes[6] = {
     Trans_Flag_gp,
@@ -2793,7 +2793,7 @@ public:
 // washes out for red-green colorblind viewers. Tilting the hexa up onto an edge
 // gently nudges each digit's pair along its own hue family, echoing the way
 // PixelSand/LargeBouncyBall let motion drive their color.
-class IshiharaDigits : public Pattern {
+class IshiharaDigits : public Pattern { // @thumbnail("#C89040", "#6EAB40")
 public:
   struct DigitPalette {
     CRGB field0, figure0; // colors while resting flat
@@ -3096,7 +3096,7 @@ public:
   }
 };
 
-class SparkleDroplets : public SoundDroplets {
+class SparkleDroplets : public SoundDroplets { // @thumbnail("#BC8701", "#2E0701")
 public:
   SparkleDroplets() : SoundDroplets(1) { }
   const char *description() {
@@ -3104,7 +3104,7 @@ public:
   }
 };
 
-class BlobDroplets : public SoundDroplets {
+class BlobDroplets : public SoundDroplets { // @thumbnail("#FF6800", "#A71612", "#1000A2")
 public:
   BlobDroplets() : SoundDroplets(2) { }
   const char *description() {
@@ -3112,7 +3112,7 @@ public:
   }
 };
 
-class SoundBits : public SoundPattern, public PaletteRotation<CRGBPalette256> {
+class SoundBits : public SoundPattern, public PaletteRotation<CRGBPalette256> { // @thumbnail("#010607", "#90D1FF", "#004952")
   HexaShells shells;
 public:
   ParticleSim<LED_COUNT> particles;
@@ -3170,6 +3170,11 @@ public:
 
 /* ------------------------------------------------------------------------------- */
 
+// 0 = Ring (fills the outer edge proportional to charge, clockwise from the
+// USB port), 1 = Pulse (whole outer edge breathes at a brightness set by
+// charge level, no fill/no direction)
+const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Ring", "Pulse")
+
 class ChargingPattern : public Pattern {
 public:
   int lastStateOfCharge = 0;
@@ -3198,17 +3203,26 @@ public:
       animateFromSOC = lastStateOfCharge;
       lastStateOfCharge = SOC;
     }
-    
+
     long animationMillis = millis() - lastValueChange;
     int displaySOC = (animationMillis > ringAnimateTime)
                       ? SOC
                       : (animateFromSOC + (SOC - animateFromSOC) * ease8InOutQuad(0xFF*animationMillis/ringAnimateTime) / 0xFF);
-    int displayLength = displaySOC * outerShell.size() / 100;
-    int maxLength = SOC * outerShell.size() / 100;
-    
+
     uint8_t hue = maxHue * SOC / 100 - minHue;
     CRGB color = CHSV(hue, 0xFF, 0xAF);
 
+    if (kChargeIndicatorStyle == 1) {
+      // Pulse: whole outer edge breathes, brightness ceiling set by charge level
+      uint8_t ceiling = 0x40 + (0xBF * displaySOC / 100);
+      uint8_t breath = beatsin8(12, 0x30, 0xFF);
+      uint8_t b = scale8(breath, ceiling);
+      for (auto &px : outerShell) ctx.leds[px.value()] = color.scale8(b);
+      return;
+    }
+
+    // Ring (default): fills the outer edge proportional to charge
+    int displayLength = displaySOC * outerShell.size() / 100;
     for (int i = 0; i < displayLength; ++i) {
       ctx.leds[outerShell[(i + firstIdx) % outerShell.size()].value()] = color.scale8(0x50 + 0x9F*i / displayLength);
     }
@@ -3320,7 +3334,7 @@ class BlinkIdentifyPattern : public Pattern {
 // 498x427 1:1, so a patch average reads far cleaner than nearest-neighbor).
 // All 32 frames are baked into rickroll_data.h at the gif's own 50ms/frame
 // pace. Re-run scripts/convert_gif.py after replacing rik.gif to regenerate it.
-class RickRoll : public Pattern {
+class RickRoll : public Pattern { // @thumbnail("#DEE7F8", "#AB6155", "#2F1C16")
   const float kUprightThreshold = 0.6f;   // in-plane gravity fraction past which we trust an edge is down
   const float kSpeedDeadzone = 0.15f;
   const float kTopSpeedMultiplier = 4.0f;    // tilt forward: sped up
@@ -3409,7 +3423,7 @@ public:
   }
 };
 
-class Billiards : public Pattern {
+class Billiards : public Pattern { // @thumbnail("#003C10", "#5A3214", "#FFD700")
   static const int kBallCount = 7; // 0 = cue, 1..6 = colored
   struct Ball {
     vectorf pos;
@@ -3886,7 +3900,7 @@ public:
 // getting from the outer entrance to the center means walking almost all the
 // way around each ring in turn. No branches, no dead ends -- exactly the
 // classic labyrinth shape, not a branching maze.
-class HexMaze : public Pattern {
+class HexMaze : public Pattern { // @thumbnail("#FFFFFF", "#14C83C", "#FFD700")
   static const int kMazeCount = 6;
 
   bool open_[LED_COUNT];
@@ -4165,7 +4179,7 @@ public:
 // content-by-delta math RickRoll uses to stay upright on any of the 6 edges
 // (there it rotates the *sample*, backward; here it rotates freshly-authored
 // content, forward -- inverse directions of the same problem).
-class WorkoutTimer : public Pattern {
+class WorkoutTimer : public Pattern { // @thumbnail("#FF8C28", "#50D2FF", "#96FF6E")
   static const int kFaceCount = 3; // 0 = face 8 (30s), 1 = face 6 (60s), 2 = face 4 (90s)
   const unsigned long kDurationMs[kFaceCount] = {30000, 60000, 90000};
 
@@ -4582,7 +4596,7 @@ public:
 // spelled-out phrases -- the board doesn't have a full alphabet designed in
 // the Hexa Font Forge tool yet, so full classic 8-ball text isn't practical
 // here; dice needs no letters at all, just real pip layouts.
-class DecisionMaker : public Pattern {
+class DecisionMaker : public Pattern { // @thumbnail("#060414", "#3CE66E", "#FF3C3C", "#FFBE28")
   enum Mode { kMode8Ball, kModeCoin, kModeDice, kModeCount };
   enum Phase { kWaiting, kRolling, kSettled };
 
@@ -4783,7 +4797,7 @@ public:
 // LargeBouncyBall/Billiards already use), brick explosions, a tap-to-fire
 // laser that cuts a whole column of bricks, and a high score persisted to
 // flash so it survives a power cycle.
-class Breakout : public Pattern {
+class Breakout : public Pattern { // @thumbnail("#FF0000", "#FF8000", "#FFE000", "#00FF00")
   static const int kBrickCount = 21;
   struct Brick {
     float x, y;
@@ -5203,7 +5217,7 @@ public:
 // neck into the other, exactly like flipping a real hourglass. Side tilt
 // gives the sand's resting surface a subtle slant. The glass outline sparkles
 // on its own, brighter and twitchier the more the device is actually moving.
-class Hourglass : public Pattern {
+class Hourglass : public Pattern { // @thumbnail("#FFDC8C", "#FFB414", "#40FFB4")
   const float kChamberHeight = 6.2f;
   const float kNeckHalfWidth = 0.45f;
   const float kBaseHalfWidth = 4.3f;

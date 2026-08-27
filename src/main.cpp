@@ -43,6 +43,7 @@ const unsigned long kStallLogMS = 15; // ~3 motion frames' worth
 #define MEASURE_PHOTO_SENSOR_BASELINE false
 PhotoSensorBrightness *autoBrightness;
 const uint8_t kDefaultBrightness = 15; // @tunable("Default Brightness", 1, 20)
+const char *kDeviceName = "motionhexa"; // @tunable_text("Device Name")
 
 DrawingContext ctx;
 HardwareControls controls;
@@ -404,7 +405,7 @@ void setup() {
   audioInput.subscribe();
 
   const char* hardwareVersionString = (v6Hardware ? "6" : xstr(HARDWARE_VERSION));
-  updater = new RP2040Updater("motionhexa", SOFTWARE_VERSION, hardwareVersionString, [](void) {
+  updater = new RP2040Updater(kDeviceName, SOFTWARE_VERSION, hardwareVersionString, [](void) {
     patternManager.runOneShotPattern<BlinkIdentifyPattern>(0xFE, 0xFF);
   });
 
