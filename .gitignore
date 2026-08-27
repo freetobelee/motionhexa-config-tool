@@ -10,3 +10,5 @@
 .pio
 .vscode
 *-backups
+# stale nested duplicate checkout, superseded by top-level src/ -- see tools/console/README.md
+/motionhexa/
