@@ -359,7 +359,6 @@
             <button class="size-tab" data-size="lg">Large<span class="n">271</span></button>
           </div>
         </div>
-        <button class="btn btn-ghost btn-small" id="resetGlyphBtn">Reset to default</button>
         <button class="btn btn-ghost btn-small" id="clearGlyphBtn">Clear</button>
         <div class="spacer"></div>
         <span class="dirty-dot" id="fontDirtyDot" title="Unsaved change on canvas"></span>
@@ -1196,13 +1195,8 @@
     });
   }
 
-  /* ---------------- font: reset / clear ---------------- */
+  /* ---------------- font: clear ---------------- */
 
-  document.getElementById("resetGlyphBtn").addEventListener("click", function () {
-    var set = A.sampleDefaultGlyph(state.ch, state.sizeKey);
-    A.loadCellsIntoCanvas(A.cellsToPairs(set), true);
-    flash(fontStatusLine, "Reset to auto-generated default.", "ok");
-  });
   document.getElementById("clearGlyphBtn").addEventListener("click", function () {
     A.loadCellsIntoCanvas([], true);
     flash(fontStatusLine, "Cleared.");
