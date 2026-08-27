@@ -1,0 +1,1605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hexa Object Forge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --bg: #0a0c11;
+    --bg-vignette: #0d1017;
+    --surface: #12151d;
+    --surface-2: #191d27;
+    --surface-3: #1f2430;
+    --border: #262b38;
+    --border-soft: #1c2029;
+    --text: #e7e9f0;
+    --text-dim: #8b93a8;
+    --text-faint: #545c6f;
+    --accent-lit: #ffb545;
+    --accent-lit-soft: #7a5a2c;
+    --accent-ui: #6ee7d6;
+    --accent-ui-dim: #3f7c76;
+    --danger: #ff6b6b;
+    --danger-dim: #7a3838;
+    --cell-off: #1a1f28;
+    --cell-off-stroke: #2c3242;
+    --cell-hover-stroke: #454e63;
+    --cell-inactive-fill: #0e1015;
+    --cell-inactive-stroke: #1a1d26;
+    --font-display: "Chakra Petch", "Arial Narrow", sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 900px 600px at 50% -10%, var(--bg-vignette) 0%, var(--bg) 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent-lit-soft); color: var(--text); }
+  a { color: var(--accent-ui); }
+
+  button { font-family: var(--font-body); cursor: pointer; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent-ui);
+    outline-offset: 2px;
+  }
+
+  .shell { max-width: 1220px; margin: 0 auto; padding: 28px 24px 64px; }
+
+  header.top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding-bottom: 18px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+  .brand .mark {
+    font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.14em;
+    color: var(--accent-lit); border: 1px solid var(--accent-lit-soft); padding: 4px 8px;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 26px; margin: 0; text-wrap: balance; }
+  header.top p { margin: 0; color: var(--text-dim); font-size: 13.5px; max-width: 36ch; }
+
+  /* ---- mode tabs (top level: Elements / Font) ---- */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .mode-tab {
+    font-family: var(--font-display); font-weight: 600; font-size: 14px; letter-spacing: 0.06em;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    padding: 11px 22px;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  }
+  .mode-tab.active { color: var(--accent-lit); border-color: var(--accent-lit-soft); background: var(--surface-2); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border-soft);
+  }
+  .panel-head h2 {
+    font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim); margin: 0;
+  }
+  .panel-body { padding: 18px; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+    padding: 16px 18px; border-bottom: 1px solid var(--border-soft);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+
+  input[type="text"] {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font-mono); font-size: 14px; padding: 9px 11px; min-width: 200px; border-radius: 3px;
+  }
+  input[type="text"]::placeholder { color: var(--text-faint); }
+  input[type="text"]:focus { border-color: var(--accent-ui-dim); }
+
+  .btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+    font-size: 13px; font-weight: 500; padding: 9px 14px; border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .btn:hover { border-color: var(--text-faint); }
+  .btn-primary { background: var(--accent-lit); border-color: var(--accent-lit); color: #1a1305; font-weight: 600; }
+  .btn-primary:hover { background: #ffc266; border-color: #ffc266; }
+  .btn-ghost { background: transparent; }
+  .btn-small { padding: 6px 10px; font-size: 12px; }
+  .spacer { flex: 1 1 auto; }
+
+  .status-line {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px; min-height: 20px;
+  }
+  .status-line .ok { color: var(--accent-lit); }
+  .status-line .warn { color: var(--danger); }
+
+  /* ---- size tabs (font mode) ---- */
+  .size-tabs { display: flex; gap: 6px; }
+  .size-tab {
+    font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+    padding: 8px 13px; border-radius: 3px;
+  }
+  .size-tab.active { color: var(--accent-ui); border-color: var(--accent-ui-dim); }
+  .size-tab .n { color: var(--text-faint); font-family: var(--font-mono); font-weight: 400; margin-left: 5px; }
+  .size-tab.active .n { color: var(--accent-ui-dim); }
+
+  /* ---- character grid (font mode) ---- */
+  .char-grid { display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--border-soft); }
+  .char-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .char-row .row-label {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); width: 34px; flex: 0 0 auto;
+  }
+  .char-btn {
+    width: 27px; height: 27px; flex: 0 0 auto;
+    background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--text-dim);
+    font-family: var(--font-mono); font-size: 13px; border-radius: 3px;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .char-btn:hover { border-color: var(--text-faint); color: var(--text); }
+  .char-btn.active { background: var(--accent-lit); border-color: var(--accent-lit); color: #1a1305; font-weight: 600; }
+
+  /* ---- canvas ---- */
+  .canvas-wrap { padding: 18px; display: flex; justify-content: center; }
+  svg#hexEditor { width: 100%; height: auto; max-width: 620px; touch-action: none; user-select: none; }
+
+  .cell {
+    fill: var(--cell-off); stroke: var(--cell-off-stroke); stroke-width: 1;
+    transition: fill 0.06s ease, stroke 0.06s ease; cursor: pointer;
+  }
+  .cell:hover { stroke: var(--cell-hover-stroke); }
+  .cell.cell--on { fill: var(--accent-lit); stroke: var(--accent-lit); filter: url(#litGlow); }
+  .cell.cell--center { stroke-dasharray: 2 2; }
+  .cell.cell--inactive { fill: var(--cell-inactive-fill); stroke: var(--cell-inactive-stroke); cursor: default; pointer-events: none; }
+  .cell.cell--inactive.cell--on { fill: var(--cell-inactive-fill); stroke: var(--cell-inactive-stroke); filter: none; }
+
+  .canvas-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 4px 18px 18px; flex-wrap: wrap;
+  }
+  .hint { font-size: 12.5px; color: var(--text-faint); }
+  .count-readout { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); }
+  .count-readout b { color: var(--accent-lit); font-weight: 600; }
+
+  /* ---- sidebar ---- */
+  .library-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 2px; }
+  .library-empty { color: var(--text-faint); font-size: 13px; padding: 10px 2px; line-height: 1.5; }
+  .lib-item {
+    display: flex; align-items: center; gap: 10px; background: var(--surface-2);
+    border: 1px solid var(--border-soft); border-left: 2px solid var(--border-soft); padding: 9px 10px; border-radius: 2px;
+  }
+  .lib-item.active { border-left-color: var(--accent-lit); }
+  .lib-item .lib-info { flex: 1 1 auto; min-width: 0; }
+  .lib-item .lib-name { font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-item .lib-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+  .icon-btn {
+    background: transparent; border: 1px solid transparent; color: var(--text-dim);
+    width: 26px; height: 26px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1;
+  }
+  .icon-btn:hover { background: var(--surface-3); color: var(--text); }
+  .icon-btn.danger:hover { background: rgba(255,107,107,0.12); color: var(--danger); }
+
+  .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; font-size: 13px; }
+  .info-grid dt { color: var(--text-faint); }
+  .info-grid dd { margin: 0; font-family: var(--font-mono); color: var(--text); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border-soft); }
+  .tab-btn {
+    flex: 1; background: transparent; border: none; color: var(--text-faint);
+    font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 12px 10px; border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--accent-ui); border-bottom-color: var(--accent-ui); }
+  .tab-panel { display: none; padding: 14px 16px; }
+  .tab-panel.active { display: block; }
+
+  textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; padding: 10px; border-radius: 3px; resize: vertical;
+  }
+  textarea#exportOut { height: 260px; }
+  textarea#importIn { height: 140px; }
+  .tab-panel .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .tab-panel p.note { font-size: 12px; color: var(--text-faint); line-height: 1.5; margin: 8px 0 0; }
+  code.k { font-family: var(--font-mono); background: var(--surface-3); padding: 1px 4px; border-radius: 2px; }
+
+  footer.legend { margin-top: 22px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 12px; color: var(--text-faint); }
+
+  /* ---- header actions: undo + version ---- */
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .nav-tabs { display: flex; gap: 8px; margin-right: 6px; }
+  .nav-tab {
+    font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.06em;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    padding: 9px 18px; text-decoration: none; display: inline-block;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .nav-tab.active { color: var(--accent-lit); border-color: var(--accent-lit-soft); background: var(--surface-2); }
+  .nav-tab:hover:not(.active) { color: var(--text); }
+  .lib-version {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
+    border: 1px solid var(--border-soft); border-radius: 3px; padding: 4px 7px;
+  }
+  .btn-undo { position: relative; }
+  .btn-undo:disabled { opacity: 0.35; cursor: default; }
+  .btn-undo:disabled:hover { border-color: var(--border); }
+
+  /* unsaved/dirty indicator next to a status line */
+  .dirty-dot {
+    display: none; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-lit); flex: 0 0 auto;
+    animation: dirty-pulse 1.6s ease-in-out infinite;
+  }
+  .dirty-dot.show { display: inline-block; }
+  @keyframes dirty-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* small corner mark on a character button that differs from its
+     auto-generated draft -- "you've actually worked on this one" */
+  .char-btn { position: relative; }
+  .char-btn.customized::after {
+    content: ""; position: absolute; top: 2px; right: 2px;
+    width: 4px; height: 4px; border-radius: 50%; background: var(--accent-ui);
+  }
+  .char-btn.active.customized::after { background: #1a1305; }
+
+  /* sticky toolbar: character/size switching stays reachable without
+     scrolling back up on a tall, narrow viewport */
+  .toolbar { position: sticky; top: 0; z-index: 5; background: var(--surface); }
+
+  /* ---- narrow viewport (~1/3 of a 15" MacBook Air, roughly 500-560px) ---- */
+  @media (max-width: 560px) {
+    .shell { padding: 16px 12px 40px; }
+    header.top { padding-bottom: 12px; margin-bottom: 12px; gap: 10px; }
+    header.top p { display: none; }
+    h1 { font-size: 20px; }
+    .brand .mark { font-size: 12px; padding: 3px 6px; }
+    .mode-tabs { margin-bottom: 12px; }
+    .mode-tab { padding: 9px 16px; font-size: 13px; }
+    .panel-body { padding: 12px; }
+    .toolbar { padding: 10px 12px; gap: 8px; }
+    input[type="text"] { min-width: 0; flex: 1 1 140px; }
+    .char-btn { width: 24px; height: 24px; font-size: 12px; }
+    .char-row .row-label { width: 28px; font-size: 10px; }
+    .canvas-wrap { padding: 10px; }
+    .canvas-foot { padding: 2px 12px 12px; }
+    textarea#exportOut { height: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header class="top">
+    <div class="brand"><span class="mark">HEXA</span><h1>Object Forge</h1></div>
+    <p>One editor for the 271-LED hex canvas: paint full-screen elements or design a 3-tier font, saved straight into <code class="k">patterns.h</code>.</p>
+    <div class="header-actions">
+      <nav class="nav-tabs">
+        <a class="nav-tab" href="/">Effects &amp; Config</a>
+        <a class="nav-tab active" href="/forge.html">Fonts &amp; Elements</a>
+      </nav>
+      <span class="dirty-dot" id="diskDirtyDot" title="Unsaved changes not yet written to patterns.h"></span>
+      <span class="lib-version" id="libVersionTag" title="Bumps on every save, delete, or import.">v1</span>
+      <button class="btn btn-ghost btn-small btn-undo" id="undoBtn" title="Undo (⌘Z / Ctrl+Z)" disabled>↺ Undo</button>
+      <button class="btn btn-primary btn-small" id="saveToDeviceBtn">Save to patterns.h</button>
+    </div>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="modeElementsBtn">Elements</button>
+    <button class="mode-tab" id="modeFontBtn">Font</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel" id="mainPanel">
+
+      <!-- Elements toolbar -->
+      <div class="toolbar" id="elementsToolbar">
+        <div class="field">
+          <label for="nameInput">Element name</label>
+          <input type="text" id="nameInput" placeholder="e.g. trophy, heart, arrow-up" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="btn btn-primary" id="saveBtn">Save</button>
+        <button class="btn btn-ghost" id="newBtn">New / clear</button>
+        <div class="spacer"></div>
+        <span class="dirty-dot" id="elementsDirtyDot" title="Unsaved change on canvas"></span>
+        <div class="status-line" id="statusLine"></div>
+      </div>
+
+      <!-- Font toolbar -->
+      <div class="toolbar" id="fontToolbar" style="display:none;">
+        <div class="field">
+          <label>Size</label>
+          <div class="size-tabs">
+            <button class="size-tab" data-size="xs">Small<span class="n">61</span></button>
+            <button class="size-tab" data-size="md">Medium<span class="n">127</span></button>
+            <button class="size-tab" data-size="lg">Large<span class="n">271</span></button>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-small" id="resetGlyphBtn">Reset to default</button>
+        <button class="btn btn-ghost btn-small" id="clearGlyphBtn">Clear</button>
+        <div class="spacer"></div>
+        <span class="dirty-dot" id="fontDirtyDot" title="Unsaved change on canvas"></span>
+        <div class="status-line" id="fontStatusLine"></div>
+      </div>
+
+      <!-- character grid -->
+      <div class="char-grid" id="charGrid" style="display:none;"></div>
+
+      <div class="canvas-wrap">
+        <svg id="hexEditor" viewBox="0 0 620 548" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="litGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="2.1" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <g id="cellLayer"></g>
+        </svg>
+      </div>
+
+      <div class="canvas-foot">
+        <span class="hint">Click a pixel to toggle it. Drag across pixels to paint — or erase — a whole stroke.</span>
+        <span class="count-readout"><b id="litCount">0</b> / <span id="activeTotal">271</span> lit</span>
+      </div>
+    </section>
+
+    <aside style="display:flex; flex-direction:column; gap:20px;">
+
+      <section class="panel" id="libraryPanel">
+        <div class="panel-head"><h2>Saved Elements</h2></div>
+        <div class="panel-body"><div class="library-list" id="libraryList"></div></div>
+      </section>
+
+      <section class="panel" id="fontInfoPanel" style="display:none;">
+        <div class="panel-head"><h2>Current Glyph</h2></div>
+        <div class="panel-body">
+          <dl class="info-grid">
+            <dt>Character</dt><dd id="infoChar">A</dd>
+            <dt>Size</dt><dd id="infoSize">Small (61 px)</dd>
+            <dt>Lit pixels</dt><dd id="infoCount">0</dd>
+            <dt>Charset</dt><dd>78 characters × 3 sizes, auto-populated</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="export">Export</button>
+          <button class="tab-btn" data-tab="import">Import</button>
+        </div>
+        <div class="tab-panel active" id="tab-export">
+          <div class="row">
+            <span class="hint">Everything saved, as pasteable C++</span>
+            <button class="btn btn-small btn-ghost" id="copyExportBtn">Copy</button>
+          </div>
+          <textarea id="exportOut" readonly spellcheck="false"></textarea>
+          <p class="note">Bitmasks, not coordinate lists: bit <code class="k">i</code> of a glyph/element's byte array is cell <code class="k">i</code> of that size's <code class="k">kHexCellQR_*</code> table (axial offset from center). Decode with <code class="k">(mask[i>>3]>>(i&7))&1</code>, then place with the same <code class="k">rotateAxialSteps</code> / <code class="k">axial.indexAtAxial</code> pattern as <code class="k">drawHexGlyphSteps</code>.</p>
+        </div>
+        <div class="tab-panel" id="tab-import">
+          <div class="row">
+            <span class="hint">Paste previously exported code</span>
+            <button class="btn btn-small btn-primary" id="parseImportBtn">Parse &amp; add</button>
+          </div>
+          <textarea id="importIn" placeholder="const uint8_t kFont_XS_A[8] PROGMEM = { 0x.. };" spellcheck="false"></textarea>
+          <p class="note" id="importStatus">Recognizes bitmask <code class="k">kFont_SIZE_CHAR[]</code> / <code class="k">kElement_NAME[]</code> arrays, and the older <code class="k">kElement_NAME[][2]</code> coordinate-list format.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="legend">
+    <span>Grid mirrors the physical hex: radius 9, 271 LEDs, center = (0, 0).</span>
+    <span>Saved locally in this browser — export before you clear your history.</span>
+    <span>Switching character, size, or element auto-saves what you were editing.</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================== geometry ============================== */
+
+  var FULL_RADIUS = 9;
+  var FULL_CELLS = [];
+  (function buildFullCells() {
+    for (var q = -FULL_RADIUS; q <= FULL_RADIUS; q++) {
+      var r1 = Math.max(-FULL_RADIUS, -q - FULL_RADIUS);
+      var r2 = Math.min(FULL_RADIUS, -q + FULL_RADIUS);
+      for (var r = r1; r <= r2; r++) {
+        var s = -q - r;
+        var dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(s));
+        var x = q + 0.5 * r, y = -Math.sqrt(3) / 2 * r;
+        FULL_CELLS.push({ q: q, r: r, x: x, y: y, dist: dist, key: q + "," + r });
+      }
+    }
+  })();
+
+  var ASPECT = Math.sqrt(3) / 2;
+  var SIZES = {
+    xs: { key: "xs", label: "Small", radius: 4, scaleX: 1.05 },
+    md: { key: "md", label: "Medium", radius: 6, scaleX: 1.65 },
+    lg: { key: "lg", label: "Large", radius: 9, scaleX: 2.75 }
+  };
+  Object.keys(SIZES).forEach(function (k) {
+    var sz = SIZES[k];
+    sz.cells = FULL_CELLS.filter(function (c) { return c.dist <= sz.radius; });
+    sz.scaleY = sz.scaleX * ASPECT;
+  });
+
+  /* ============================== charset (populated in part 2) ============================== */
+  var FONT_5X7 = {}; // filled in below
+  var SYMBOLS = [];  // filled in below
+  var UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  var LOWER = "abcdefghijklmnopqrstuvwxyz".split("");
+  var DIGITS = "0123456789".split("");
+
+  /* ============================== shapes (populated in part 2) ============================== */
+  var SHAPES = {};
+
+  window.__hexaForge = {
+    FULL_CELLS: FULL_CELLS, SIZES: SIZES,
+    setFont: function (f) { FONT_5X7 = f; },
+    setSymbols: function (s) { SYMBOLS = s; },
+    setShapes: function (s) { SHAPES = s; },
+    getFont: function () { return FONT_5X7; },
+    getSymbols: function () { return SYMBOLS; },
+    getShapes: function () { return SHAPES; },
+    UPPER: UPPER, LOWER: LOWER, DIGITS: DIGITS
+  };
+})();
+</script>
+
+<script>
+/* ============================== 5x7 source font ==============================
+   Draft letterforms used only to auto-populate every glyph slot so there is
+   always something on the canvas to modify. "." = off, "X" = on, top row
+   first, 5 characters wide. Rough by design -- meant to be repainted. */
+(function () {
+  "use strict";
+  var FONT_5X7 = {
+    "A": ["..X..",".X.X.","X...X","X...X","XXXXX","X...X","X...X"],
+    "B": ["XXXX.","X...X","X...X","XXXX.","X...X","X...X","XXXX."],
+    "C": [".XXXX","X....","X....","X....","X....","X....",".XXXX"],
+    "D": ["XXXX.","X...X","X...X","X...X","X...X","X...X","XXXX."],
+    "E": ["XXXXX","X....","X....","XXXX.","X....","X....","XXXXX"],
+    "F": ["XXXXX","X....","X....","XXXX.","X....","X....","X...."],
+    "G": [".XXXX","X....","X....","X.XXX","X...X","X...X",".XXXX"],
+    "H": ["X...X","X...X","X...X","XXXXX","X...X","X...X","X...X"],
+    "I": ["XXXXX","..X..","..X..","..X..","..X..","..X..","XXXXX"],
+    "J": ["..XXX","...X.","...X.","...X.","...X.","X..X.",".XX.."],
+    "K": ["X...X","X..X.","X.X..","XX...","X.X..","X..X.","X...X"],
+    "L": ["X....","X....","X....","X....","X....","X....","XXXXX"],
+    "M": ["X...X","XX.XX","X.X.X","X...X","X...X","X...X","X...X"],
+    "N": ["X...X","XX..X","X.X.X","X..XX","X...X","X...X","X...X"],
+    "O": [".XXX.","X...X","X...X","X...X","X...X","X...X",".XXX."],
+    "P": ["XXXX.","X...X","X...X","XXXX.","X....","X....","X...."],
+    "Q": [".XXX.","X...X","X...X","X...X","X.X.X","X..X.",".XX.X"],
+    "R": ["XXXX.","X...X","X...X","XXXX.","X.X..","X..X.","X...X"],
+    "S": [".XXXX","X....","X....",".XXX.","....X","....X","XXXX."],
+    "T": ["XXXXX","..X..","..X..","..X..","..X..","..X..","..X.."],
+    "U": ["X...X","X...X","X...X","X...X","X...X","X...X",".XXX."],
+    "V": ["X...X","X...X","X...X","X...X","X...X",".X.X.","..X.."],
+    "W": ["X...X","X...X","X...X","X.X.X","X.X.X","X.X.X",".X.X."],
+    "X": ["X...X","X...X",".X.X.","..X..",".X.X.","X...X","X...X"],
+    "Y": ["X...X","X...X",".X.X.","..X..","..X..","..X..","..X.."],
+    "Z": ["XXXXX","....X","...X.","..X..",".X...","X....","XXXXX"],
+
+    "0": [".XXX.","X...X","X..XX","X.X.X","XX..X","X...X",".XXX."],
+    "1": ["..X..",".XX..","..X..","..X..","..X..","..X..",".XXX."],
+    "2": [".XXX.","X...X","....X","...X.","..X..",".X...","XXXXX"],
+    "3": [".XXX.","X...X","....X","..XX.","....X","X...X",".XXX."],
+    "4": ["...X.","..XX.",".X.X.","X..X.","XXXXX","...X.","...X."],
+    "5": ["XXXXX","X....","XXXX.","....X","....X","X...X",".XXX."],
+    "6": ["..XX.",".X...","X....","XXXX.","X...X","X...X",".XXX."],
+    "7": ["XXXXX","....X","...X.","..X..",".X...",".X...",".X..."],
+    "8": [".XXX.","X...X","X...X",".XXX.","X...X","X...X",".XXX."],
+    "9": [".XXX.","X...X","X...X",".XXXX","....X","...X.",".XX.."],
+
+    "a": [".....",".XXX.","....X",".XXXX","X...X","X..XX",".XX.X"],
+    "b": ["X....","X....","XXXX.","X...X","X...X","X...X","XXXX."],
+    "c": [".....",".....",".XXXX","X....","X....","X....",".XXXX"],
+    "d": ["....X","....X",".XXXX","X...X","X...X","X...X",".XXXX"],
+    "e": [".....",".XXX.","X...X","XXXXX","X....","X....",".XXXX"],
+    "f": ["..XX.",".X...","XXXX.",".X...",".X...",".X...",".X..."],
+    "g": [".....",".XXXX","X...X","X...X",".XXXX","....X",".XXX."],
+    "h": ["X....","X....","XXXX.","X...X","X...X","X...X","X...X"],
+    "i": ["..X..",".....",".XX..","..X..","..X..","..X..",".XXX."],
+    "j": ["...X.",".....","..XX.","...X.","...X.","X..X.",".XX.."],
+    "k": ["X....","X....","X..X.","X.X..","XX...","X.X..","X..X."],
+    "l": [".XX..","..X..","..X..","..X..","..X..","..X..",".XXX."],
+    "m": [".....","XX.X.","X.X.X","X.X.X","X.X.X","X...X","X...X"],
+    "n": [".....","X.XX.","XX..X","X...X","X...X","X...X","X...X"],
+    "o": [".....",".XXX.","X...X","X...X","X...X","X...X",".XXX."],
+    "p": [".....","XXXX.","X...X","X...X","XXXX.","X....","X...."],
+    "q": [".....",".XXXX","X...X","X...X",".XXXX","....X","....X"],
+    "r": [".....","X.XX.","XX..X","X....","X....","X....","X...."],
+    "s": [".....",".XXXX","X....",".XXX.","....X","....X","XXXX."],
+    "t": ["..X..",".XXX.","..X..","..X..","..X..","..X..","...XX"],
+    "u": [".....","X...X","X...X","X...X","X...X","X..XX",".XX.X"],
+    "v": [".....","X...X","X...X","X...X","X...X",".X.X.","..X.."],
+    "w": [".....","X...X","X...X","X.X.X","X.X.X","X.X.X",".X.X."],
+    "x": [".....","X...X",".X.X.","..X..",".X.X.","X...X","X...X"],
+    "y": [".....","X...X","X...X","X...X",".XXXX","....X",".XXX."],
+    "z": [".....","XXXXX","...X.","..X..",".X...","X....","XXXXX"],
+
+    " ": [".....",".....",".....",".....",".....",".....","....."],
+    ".": [".....",".....",".....",".....",".....",".XX..",".XX.."],
+    ",": [".....",".....",".....",".....",".....",".XX..","..X.."],
+    ":": [".....",".XX..",".XX..",".....",".XX..",".XX..","....."],
+    ";": [".....",".XX..",".XX..",".....",".XX..","..X..",".X..."],
+    "!": ["..X..","..X..","..X..","..X..","..X..",".....","..X.."],
+    "?": [".XXX.","X...X","....X","..XX.","..X..",".....","..X.."],
+    "-": [".....",".....",".....","XXXXX",".....",".....","....."],
+    "+": [".....","..X..","..X..","XXXXX","..X..","..X..","....."],
+    "=": [".....",".....","XXXXX",".....","XXXXX",".....","....."],
+    "/": ["....X","...X.","..X..","..X..","..X..",".X...","X...."],
+    "(": ["...X.","..X..",".X...",".X...",".X...","..X..","...X."],
+    ")": [".X...","..X..","...X.","...X.","...X.","..X..",".X..."],
+    "°": [".XX..","X..X.",".XX..",".....",".....",".....","....."],
+    "&": [".XX..","X..X.","X.X..",".X...","X.X.X","X..X.",".XX.X"],
+    "'": ["..X..","..X..",".....",".....",".....",".....","....."]
+  };
+
+  var SYMBOLS = [
+    { ch: " ", id: "SPACE", label: "␣" },
+    { ch: ".", id: "PERIOD", label: "." },
+    { ch: ",", id: "COMMA", label: "," },
+    { ch: ":", id: "COLON", label: ":" },
+    { ch: ";", id: "SEMI", label: ";" },
+    { ch: "!", id: "BANG", label: "!" },
+    { ch: "?", id: "QMARK", label: "?" },
+    { ch: "-", id: "DASH", label: "-" },
+    { ch: "+", id: "PLUS", label: "+" },
+    { ch: "=", id: "EQUALS", label: "=" },
+    { ch: "/", id: "SLASH", label: "/" },
+    { ch: "(", id: "LPAREN", label: "(" },
+    { ch: ")", id: "RPAREN", label: ")" },
+    { ch: "°", id: "DEGREE", label: "°" },
+    { ch: "&", id: "AMP", label: "&" },
+    { ch: "'", id: "APOS", label: "'" }
+  ];
+
+  window.__hexaForge.setFont(FONT_5X7);
+  window.__hexaForge.setSymbols(SYMBOLS);
+})();
+</script>
+
+<script>
+/* ============================== element shapes ==============================
+   Pre-seeded "large" (271px) elements, each a plain membership test in rect
+   space (same x/y the cell table already carries) -- circles, triangles,
+   segment-distance, and polygon tests rather than freehand pixel art. */
+(function () {
+  "use strict";
+
+  function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
+    function sign(x1, y1, x2, y2, x3, y3) { return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3); }
+    var d1 = sign(px, py, ax, ay, bx, by);
+    var d2 = sign(px, py, bx, by, cx, cy);
+    var d3 = sign(px, py, cx, cy, ax, ay);
+    var hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    var hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+    return !(hasNeg && hasPos);
+  }
+
+  function distToSegment(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var lenSq = dx * dx + dy * dy;
+    var t = lenSq > 0 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    var cx = ax + t * dx, cy = ay + t * dy;
+    return Math.hypot(px - cx, py - cy);
+  }
+
+  function inPolygon(px, py, pts) {
+    var inside = false;
+    for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      var xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      var intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  var SHAPES = {
+    HEART: function (x, y) {
+      var inC1 = Math.hypot(x - (-1.8), y - 2.0) <= 2.6;
+      var inC2 = Math.hypot(x - 1.8, y - 2.0) <= 2.6;
+      var inTri = inTriangle(x, y, 0, -5.5, -3.8, 1.2, 3.8, 1.2);
+      return inC1 || inC2 || inTri;
+    },
+    STAR: function (x, y) {
+      var pts = [];
+      for (var i = 0; i < 10; i++) {
+        var ang = (Math.PI / 2) - i * (Math.PI / 5);
+        var rad = (i % 2 === 0) ? 6.5 : 2.7;
+        pts.push([rad * Math.cos(ang), rad * Math.sin(ang)]);
+      }
+      return inPolygon(x, y, pts);
+    },
+    ARROW_UP: function (x, y) {
+      var inTri = inTriangle(x, y, 0, 6.5, -3.2, 2.0, 3.2, 2.0);
+      var inShaft = Math.abs(x) <= 1.1 && y >= -6.0 && y <= 2.2;
+      return inTri || inShaft;
+    },
+    ARROW_DOWN: function (x, y) {
+      var inTri = inTriangle(x, y, 0, -6.5, -3.2, -2.0, 3.2, -2.0);
+      var inShaft = Math.abs(x) <= 1.1 && y <= 6.0 && y >= -2.2;
+      return inTri || inShaft;
+    },
+    CHECK: function (x, y) {
+      var d1 = distToSegment(x, y, -3.6, -0.5, -0.8, -3.5);
+      var d2 = distToSegment(x, y, -0.8, -3.5, 4.5, 4.5);
+      return Math.min(d1, d2) <= 0.9;
+    },
+    CROSS: function (x, y) {
+      var d1 = distToSegment(x, y, -5.5, 5.0, 5.5, -5.0);
+      var d2 = distToSegment(x, y, -5.5, -5.0, 5.5, 5.0);
+      return Math.min(d1, d2) <= 0.9;
+    },
+    RING: function (x, y) {
+      var r = Math.hypot(x, y);
+      return Math.abs(r - 5.5) <= 1.1;
+    },
+    DIAMOND: function (x, y) {
+      return Math.abs(x) / 5.5 + Math.abs(y) / 6.5 <= 1.0;
+    }
+  };
+
+  window.__hexaForge.setShapes(SHAPES);
+  window.__hexaForge.DEFAULT_ELEMENTS = {
+    "heart": "HEART", "star": "STAR", "arrow up": "ARROW_UP", "arrow down": "ARROW_DOWN",
+    "check": "CHECK", "cross": "CROSS", "ring": "RING", "diamond": "DIAMOND"
+  };
+})();
+</script>
+
+<script>
+/* ============================== app ============================== */
+(function () {
+  "use strict";
+
+  var FG = window.__hexaForge;
+  var FULL_CELLS = FG.FULL_CELLS;
+  var SIZES = FG.SIZES;
+  var FONT_5X7 = FG.getFont();
+  var SYMBOLS = FG.getSymbols();
+  var SHAPES = FG.getShapes();
+  var UPPER = FG.UPPER, LOWER = FG.LOWER, DIGITS = FG.DIGITS;
+  var ALL_CHARS = UPPER.concat(LOWER).concat(DIGITS).concat(SYMBOLS.map(function (s) { return s.ch; }));
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var cellLayer = document.getElementById("cellLayer");
+  var svgEl = document.getElementById("hexEditor");
+  var CX = 310, CY = 274, SCALE = 30, CELL_R = 17;
+
+  function hexPoints(cx, cy, r) {
+    var pts = [];
+    for (var i = 0; i < 6; i++) {
+      var a = (Math.PI / 180) * (60 * i + 30);
+      pts.push((cx + r * Math.cos(a)).toFixed(2) + "," + (cy + r * Math.sin(a)).toFixed(2));
+    }
+    return pts.join(" ");
+  }
+
+  var cellEls = {};
+  FULL_CELLS.forEach(function (c) {
+    var cx = CX + c.x * SCALE;
+    var cy = CY - c.y * SCALE; // rect space is +y up, SVG is +y down
+    var poly = document.createElementNS(SVG_NS, "polygon");
+    poly.setAttribute("points", hexPoints(cx, cy, CELL_R));
+    poly.setAttribute("class", "cell" + (c.q === 0 && c.r === 0 ? " cell--center" : ""));
+    poly.dataset.key = c.key;
+    cellLayer.appendChild(poly);
+    cellEls[c.key] = poly;
+  });
+
+  function applyActiveRadius(radius) {
+    FULL_CELLS.forEach(function (c) {
+      var el = cellEls[c.key];
+      el.classList.toggle("cell--inactive", c.dist > radius);
+    });
+    document.getElementById("activeTotal").textContent = FULL_CELLS.filter(function (c) { return c.dist <= radius; }).length;
+  }
+
+  /* ---------------- sampling: 5x7 source font -> any size's cell set ---------------- */
+
+  function sampleDefaultGlyph(ch, sizeKey) {
+    var rows = FONT_5X7[ch];
+    var set = new Set();
+    if (!rows) return set;
+    var sz = SIZES[sizeKey];
+    sz.cells.forEach(function (c) {
+      var srcCol = c.x / sz.scaleX + 2;
+      var srcRow = 3 - c.y / sz.scaleY;
+      var gc = Math.round(srcCol), gr = Math.round(srcRow);
+      if (gc >= 0 && gc < 5 && gr >= 0 && gr < 7 && rows[gr][gc] === "X") set.add(c.key);
+    });
+    return set;
+  }
+
+  function sampleShape(testFn) {
+    var set = new Set();
+    SIZES.lg.cells.forEach(function (c) { if (testFn(c.x, c.y)) set.add(c.key); });
+    return set;
+  }
+
+  function cellsToPairs(set) {
+    return Array.from(set).map(function (k) { return k.split(",").map(Number); });
+  }
+  function pairsToSet(pairs) {
+    var set = new Set();
+    (pairs || []).forEach(function (p) { set.add(p[0] + "," + p[1]); });
+    return set;
+  }
+
+  /* ---------------- storage ---------------- */
+
+  var STORAGE_KEY = "hexaObjectForge.v1";
+  var LEGACY_KEY = "hexaElementForge.v1";
+  var data = { elements: {}, font: { xs: {}, md: {}, lg: {} }, libVersion: 0, syncedHashes: null };
+
+  function loadStorage() {
+    var loaded = null;
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) loaded = JSON.parse(raw);
+    } catch (e) { /* ignore corrupt storage */ }
+    if (loaded) {
+      data.elements = loaded.elements || {};
+      data.font.xs = (loaded.font && loaded.font.xs) || {};
+      data.font.md = (loaded.font && loaded.font.md) || {};
+      data.font.lg = (loaded.font && loaded.font.lg) || {};
+      data.libVersion = loaded.libVersion || 0;
+      data.syncedHashes = loaded.syncedHashes || null;
+    } else {
+      try {
+        var legacyRaw = localStorage.getItem(LEGACY_KEY);
+        if (legacyRaw) {
+          var legacy = JSON.parse(legacyRaw);
+          if (legacy && legacy.library) data.elements = legacy.library;
+        }
+      } catch (e2) { /* ignore corrupt storage */ }
+    }
+  }
+
+  function saveStorage() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+  }
+
+  function autoPopulate() {
+    var changed = false;
+    Object.keys(SIZES).forEach(function (sk) {
+      ALL_CHARS.forEach(function (ch) {
+        if (!data.font[sk][ch]) {
+          data.font[sk][ch] = cellsToPairs(sampleDefaultGlyph(ch, sk));
+          changed = true;
+        }
+      });
+    });
+    Object.keys(FG.DEFAULT_ELEMENTS).forEach(function (name) {
+      if (!data.elements[name]) {
+        data.elements[name] = cellsToPairs(sampleShape(SHAPES[FG.DEFAULT_ELEMENTS[name]]));
+        changed = true;
+      }
+    });
+    if (changed) saveStorage();
+  }
+
+  /* ---------------- state ---------------- */
+
+  var state = { mode: "elements", sizeKey: "xs", ch: "A", elementName: null };
+  var onCells = new Set();
+
+  /* ---------------- dirty tracking ---------------- */
+
+  var lastCommittedKey = "";
+  function serializeCells() {
+    return Array.from(onCells).sort().join("|");
+  }
+  function updateDirtyIndicator() {
+    var dirty = serializeCells() !== lastCommittedKey;
+    var elDot = document.getElementById("elementsDirtyDot");
+    var fDot = document.getElementById("fontDirtyDot");
+    if (elDot) elDot.classList.toggle("show", dirty && state.mode === "elements");
+    if (fDot) fDot.classList.toggle("show", dirty && state.mode === "font");
+  }
+  function markClean() {
+    lastCommittedKey = serializeCells();
+    updateDirtyIndicator();
+  }
+
+  /* ---------------- undo ---------------- */
+
+  var UNDO_LIMIT = 20;
+  var undoStack = [];
+  function pushUndo() {
+    undoStack.push(JSON.stringify({ elements: data.elements, font: data.font }));
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    var btn = document.getElementById("undoBtn");
+    if (btn) btn.disabled = false;
+  }
+  function canUndo() { return undoStack.length > 0; }
+  function performUndo() {
+    if (!undoStack.length) return false;
+    var prev = JSON.parse(undoStack.pop());
+    data.elements = prev.elements;
+    data.font = prev.font;
+    bumpVersion();
+    saveStorage();
+    var btn = document.getElementById("undoBtn");
+    if (btn) btn.disabled = !undoStack.length;
+    return true;
+  }
+  function bumpVersion() {
+    data.libVersion = (data.libVersion || 0) + 1;
+    var tag = document.getElementById("libVersionTag");
+    if (tag) tag.textContent = "v" + data.libVersion;
+    var diskDot = document.getElementById("diskDirtyDot");
+    if (diskDot) diskDot.classList.add("show");
+  }
+
+  function setCellState(key, on) {
+    if (on) onCells.add(key); else onCells.delete(key);
+    var el = cellEls[key];
+    if (el) el.classList.toggle("cell--on", on);
+    updateCount();
+    updateDirtyIndicator();
+  }
+
+  function loadCellsIntoCanvas(pairs, keepDirty) {
+    onCells.forEach(function (key) {
+      var el = cellEls[key];
+      if (el) el.classList.remove("cell--on");
+    });
+    onCells.clear();
+    (pairs || []).forEach(function (p) { setCellState(p[0] + "," + p[1], true); });
+    if (keepDirty) updateDirtyIndicator(); else markClean();
+  }
+
+  function updateCount() {
+    document.getElementById("litCount").textContent = onCells.size;
+    var infoCount = document.getElementById("infoCount");
+    if (infoCount) infoCount.textContent = onCells.size;
+  }
+
+  /* ---------------- paint interaction ---------------- */
+
+  var painting = false, paintOn = true;
+  svgEl.addEventListener("pointerdown", function (e) {
+    var t = e.target.closest && e.target.closest(".cell:not(.cell--inactive)");
+    if (!t) return;
+    painting = true;
+    paintOn = !onCells.has(t.dataset.key);
+    setCellState(t.dataset.key, paintOn);
+    e.preventDefault();
+  });
+  window.addEventListener("pointermove", function (e) {
+    if (!painting) return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    var t = el && el.closest && el.closest(".cell:not(.cell--inactive)");
+    if (t) setCellState(t.dataset.key, paintOn);
+  });
+  window.addEventListener("pointerup", function () { painting = false; });
+  window.addEventListener("pointercancel", function () { painting = false; });
+
+  window.__hexaForgeApp = {
+    data: data, state: state, onCells: onCells,
+    loadStorage: loadStorage, saveStorage: saveStorage, autoPopulate: autoPopulate,
+    applyActiveRadius: applyActiveRadius, loadCellsIntoCanvas: loadCellsIntoCanvas,
+    setCellState: setCellState, updateCount: updateCount,
+    sampleDefaultGlyph: sampleDefaultGlyph, sampleShape: sampleShape,
+    cellsToPairs: cellsToPairs, pairsToSet: pairsToSet,
+    ALL_CHARS: ALL_CHARS, UPPER: UPPER, LOWER: LOWER, DIGITS: DIGITS, SYMBOLS: SYMBOLS, SHAPES: SHAPES,
+    SIZES: SIZES,
+    markClean: markClean, updateDirtyIndicator: updateDirtyIndicator,
+    pushUndo: pushUndo, canUndo: canUndo, performUndo: performUndo, bumpVersion: bumpVersion
+  };
+})();
+</script>
+
+<script>
+/* ============================== navigation + UI ============================== */
+(function () {
+  "use strict";
+
+  var A = window.__hexaForgeApp;
+  var data = A.data, state = A.state, onCells = A.onCells, SIZES = A.SIZES;
+  var nameInput = document.getElementById("nameInput");
+  var statusLine = document.getElementById("statusLine");
+  var fontStatusLine = document.getElementById("fontStatusLine");
+
+  function flash(el, text, kind) {
+    el.innerHTML = kind ? '<span class="' + kind + '">' + text + "</span>" : text;
+    if (el._t) clearTimeout(el._t);
+    el._t = setTimeout(function () { el.textContent = ""; }, 2600);
+  }
+
+  function pairsEqual(a, b) {
+    a = a || []; b = b || [];
+    if (a.length !== b.length) return false;
+    var as = a.map(function (p) { return p[0] + "," + p[1]; }).sort();
+    var bs = b.map(function (p) { return p[0] + "," + p[1]; }).sort();
+    for (var i = 0; i < as.length; i++) { if (as[i] !== bs[i]) return false; }
+    return true;
+  }
+
+  /* ---------------- commit current canvas before navigating away ---------------- */
+
+  function commitCurrent() {
+    var committed = false;
+    if (state.mode === "elements") {
+      var name = nameInput.value.trim();
+      if (name && onCells.size > 0) {
+        var newPairs = A.cellsToPairs(onCells);
+        if (!pairsEqual(newPairs, data.elements[name])) {
+          A.pushUndo();
+          data.elements[name] = newPairs;
+          A.bumpVersion();
+        }
+        state.elementName = name;
+        committed = true;
+      }
+    } else if (state.ch != null) {
+      var newFontPairs = A.cellsToPairs(onCells);
+      if (!pairsEqual(newFontPairs, data.font[state.sizeKey][state.ch])) {
+        A.pushUndo();
+        data.font[state.sizeKey][state.ch] = newFontPairs;
+        A.bumpVersion();
+        updateCharGridCustomizedMarks();
+      }
+      var label = state.ch === " " ? "space" : "‘" + state.ch + "’";
+      flash(fontStatusLine, "Saved " + label + " (" + SIZES[state.sizeKey].label + ", " + onCells.size + " px).", "ok");
+      committed = true;
+    }
+    if (committed) A.markClean();
+    A.saveStorage();
+    return committed;
+  }
+
+  /* ---------------- mode switching ---------------- */
+
+  function refreshModeChrome() {
+    var isElements = state.mode === "elements";
+    document.getElementById("modeElementsBtn").classList.toggle("active", isElements);
+    document.getElementById("modeFontBtn").classList.toggle("active", !isElements);
+    document.getElementById("elementsToolbar").style.display = isElements ? "" : "none";
+    document.getElementById("fontToolbar").style.display = isElements ? "none" : "";
+    document.getElementById("charGrid").style.display = isElements ? "none" : "";
+    document.getElementById("libraryPanel").style.display = isElements ? "" : "none";
+    document.getElementById("fontInfoPanel").style.display = isElements ? "none" : "";
+  }
+
+  function selectMode(mode) {
+    if (mode === state.mode) return;
+    commitCurrent();
+    state.mode = mode;
+    if (mode === "elements") {
+      A.applyActiveRadius(9);
+      nameInput.value = state.elementName || "";
+      A.loadCellsIntoCanvas(state.elementName ? data.elements[state.elementName] : []);
+      renderLibrary();
+    } else {
+      A.applyActiveRadius(SIZES[state.sizeKey].radius);
+      A.loadCellsIntoCanvas(data.font[state.sizeKey][state.ch]);
+      updateSizeTabHighlight();
+      updateCharGridHighlight();
+      updateCharGridCustomizedMarks();
+      updateFontInfo();
+    }
+    refreshModeChrome();
+  }
+
+  document.getElementById("modeElementsBtn").addEventListener("click", function () { selectMode("elements"); });
+  document.getElementById("modeFontBtn").addEventListener("click", function () { selectMode("font"); });
+
+  /* ---------------- font: character + size selection ---------------- */
+
+  function updateFontInfo() {
+    document.getElementById("infoChar").textContent = state.ch === " " ? "SPACE" : state.ch;
+    document.getElementById("infoSize").textContent = SIZES[state.sizeKey].label + " (" + SIZES[state.sizeKey].cells.length + " px)";
+  }
+
+  function selectChar(ch) {
+    if (ch === state.ch) return;
+    commitCurrent();
+    state.ch = ch;
+    A.loadCellsIntoCanvas(data.font[state.sizeKey][ch]);
+    updateCharGridHighlight();
+    updateFontInfo();
+  }
+
+  function selectSize(sizeKey) {
+    if (sizeKey === state.sizeKey) return;
+    commitCurrent();
+    state.sizeKey = sizeKey;
+    A.applyActiveRadius(SIZES[sizeKey].radius);
+    A.loadCellsIntoCanvas(data.font[sizeKey][state.ch]);
+    updateSizeTabHighlight();
+    updateCharGridCustomizedMarks();
+    updateFontInfo();
+  }
+
+  function updateCharGridHighlight() {
+    document.querySelectorAll(".char-btn").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.ch === state.ch);
+    });
+  }
+  function isCustomized(ch, sizeKey) {
+    var current = data.font[sizeKey][ch];
+    if (!current) return false;
+    var def = A.cellsToPairs(A.sampleDefaultGlyph(ch, sizeKey));
+    if (current.length !== def.length) return true;
+    var curSet = {};
+    current.forEach(function (p) { curSet[p[0] + "," + p[1]] = true; });
+    for (var i = 0; i < def.length; i++) {
+      if (!curSet[def[i][0] + "," + def[i][1]]) return true;
+    }
+    return false;
+  }
+  function updateCharGridCustomizedMarks() {
+    document.querySelectorAll(".char-btn").forEach(function (b) {
+      b.classList.toggle("customized", isCustomized(b.dataset.ch, state.sizeKey));
+    });
+  }
+  function updateSizeTabHighlight() {
+    document.querySelectorAll(".size-tab").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.size === state.sizeKey);
+    });
+  }
+
+  document.querySelectorAll(".size-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () { selectSize(btn.dataset.size); });
+  });
+
+  function renderCharGrid() {
+    var grid = document.getElementById("charGrid");
+    grid.innerHTML = "";
+    function addRow(label, chars, labelFor) {
+      var row = document.createElement("div");
+      row.className = "char-row";
+      var lab = document.createElement("span");
+      lab.className = "row-label";
+      lab.textContent = label;
+      row.appendChild(lab);
+      chars.forEach(function (ch) {
+        var btn = document.createElement("button");
+        btn.className = "char-btn";
+        btn.dataset.ch = ch;
+        btn.textContent = labelFor ? labelFor(ch) : ch;
+        btn.addEventListener("click", function () { selectChar(ch); });
+        row.appendChild(btn);
+      });
+      grid.appendChild(row);
+    }
+    addRow("ABC", A.UPPER);
+    addRow("abc", A.LOWER);
+    addRow("123", A.DIGITS);
+    addRow("Sym", A.SYMBOLS.map(function (s) { return s.ch; }), function (ch) {
+      var found = A.SYMBOLS.find(function (s) { return s.ch === ch; });
+      return found ? found.label : ch;
+    });
+  }
+
+  /* ---------------- elements: save / new / library list ---------------- */
+
+  document.getElementById("saveBtn").addEventListener("click", function () {
+    var name = nameInput.value.trim();
+    if (!name) { flash(statusLine, "Name the element before saving.", "warn"); nameInput.focus(); return; }
+    if (onCells.size === 0) { flash(statusLine, "Nothing painted yet — light up a few pixels first.", "warn"); return; }
+    var newPairs = A.cellsToPairs(onCells);
+    if (!pairsEqual(newPairs, data.elements[name])) {
+      A.pushUndo();
+      data.elements[name] = newPairs;
+      A.bumpVersion();
+    }
+    state.elementName = name;
+    A.markClean();
+    A.saveStorage();
+    renderLibrary();
+    window.__hexaForgeIO.renderExport();
+    flash(statusLine, "Saved “" + name + "” (" + onCells.size + " px).", "ok");
+  });
+
+  document.getElementById("newBtn").addEventListener("click", function () {
+    commitCurrent();
+    A.loadCellsIntoCanvas([]);
+    nameInput.value = "";
+    state.elementName = null;
+    renderLibrary();
+    flash(statusLine, "Cleared. Ready for a new element.");
+    nameInput.focus();
+  });
+
+  var libraryListEl = document.getElementById("libraryList");
+
+  function renderLibrary() {
+    var names = Object.keys(data.elements).sort(function (a, b) { return a.localeCompare(b); });
+    if (names.length === 0) {
+      libraryListEl.innerHTML = '<div class="library-empty">Nothing saved yet.</div>';
+      return;
+    }
+    libraryListEl.innerHTML = "";
+    names.forEach(function (name) {
+      var cells = data.elements[name];
+      var item = document.createElement("div");
+      item.className = "lib-item" + (name === state.elementName ? " active" : "");
+
+      var info = document.createElement("div");
+      info.className = "lib-info";
+      var nm = document.createElement("div");
+      nm.className = "lib-name"; nm.textContent = name;
+      var ct = document.createElement("div");
+      ct.className = "lib-count"; ct.textContent = cells.length + " px";
+      info.appendChild(nm); info.appendChild(ct);
+
+      var loadBtn = document.createElement("button");
+      loadBtn.className = "icon-btn"; loadBtn.title = "Load into canvas"; loadBtn.textContent = "↑";
+      loadBtn.addEventListener("click", function () {
+        commitCurrent();
+        A.loadCellsIntoCanvas(cells);
+        nameInput.value = name;
+        state.elementName = name;
+        renderLibrary();
+        flash(statusLine, "Loaded “" + name + "”.");
+      });
+
+      var delBtn = document.createElement("button");
+      delBtn.className = "icon-btn danger"; delBtn.title = "Delete"; delBtn.textContent = "×";
+      delBtn.addEventListener("click", function () {
+        if (delBtn.dataset.confirm === "1") {
+          A.pushUndo();
+          delete data.elements[name];
+          A.bumpVersion();
+          if (state.elementName === name) {
+            state.elementName = null;
+            A.loadCellsIntoCanvas([]);
+            nameInput.value = "";
+          }
+          A.saveStorage();
+          renderLibrary();
+          window.__hexaForgeIO.renderExport();
+          flash(statusLine, "Deleted “" + name + "”.");
+        } else {
+          delBtn.dataset.confirm = "1";
+          delBtn.textContent = "✓";
+          delBtn.title = "Click again to confirm delete";
+          setTimeout(function () { delBtn.dataset.confirm = "0"; delBtn.textContent = "×"; delBtn.title = "Delete"; }, 2500);
+        }
+      });
+
+      item.appendChild(info); item.appendChild(loadBtn); item.appendChild(delBtn);
+      libraryListEl.appendChild(item);
+    });
+  }
+
+  /* ---------------- font: reset / clear ---------------- */
+
+  document.getElementById("resetGlyphBtn").addEventListener("click", function () {
+    var set = A.sampleDefaultGlyph(state.ch, state.sizeKey);
+    A.loadCellsIntoCanvas(A.cellsToPairs(set), true);
+    flash(fontStatusLine, "Reset to auto-generated default.", "ok");
+  });
+  document.getElementById("clearGlyphBtn").addEventListener("click", function () {
+    A.loadCellsIntoCanvas([], true);
+    flash(fontStatusLine, "Cleared.");
+  });
+
+  /* ---------------- undo ---------------- */
+
+  var undoBtn = document.getElementById("undoBtn");
+
+  function doUndo() {
+    if (!A.performUndo()) return;
+    if (state.mode === "elements") {
+      if (state.elementName && !data.elements[state.elementName]) state.elementName = null;
+      A.loadCellsIntoCanvas(state.elementName ? data.elements[state.elementName] : []);
+      nameInput.value = state.elementName || "";
+      renderLibrary();
+      flash(statusLine, "Undone.", "ok");
+    } else {
+      A.loadCellsIntoCanvas(data.font[state.sizeKey][state.ch]);
+      updateFontInfo();
+      flash(fontStatusLine, "Undone.", "ok");
+    }
+    updateCharGridCustomizedMarks();
+    if (window.__hexaForgeIO) window.__hexaForgeIO.renderExport();
+  }
+
+  if (undoBtn) undoBtn.addEventListener("click", doUndo);
+  window.addEventListener("keydown", function (e) {
+    var key = e.key ? e.key.toLowerCase() : "";
+    if (!(e.metaKey || e.ctrlKey) || key !== "z" || e.shiftKey) return;
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "TEXTAREA" || tag === "INPUT") return;
+    e.preventDefault();
+    doUndo();
+  });
+
+  window.__hexaForgeUI = {
+    commitCurrent: commitCurrent, renderLibrary: renderLibrary, renderCharGrid: renderCharGrid,
+    updateCharGridHighlight: updateCharGridHighlight, updateSizeTabHighlight: updateSizeTabHighlight,
+    updateCharGridCustomizedMarks: updateCharGridCustomizedMarks,
+    updateFontInfo: updateFontInfo, refreshModeChrome: refreshModeChrome, flash: flash,
+    statusLine: statusLine
+  };
+})();
+</script>
+
+<script>
+/* ============================== export / import ============================== */
+(function () {
+  "use strict";
+
+  var A = window.__hexaForgeApp;
+  var data = A.data, SIZES = A.SIZES, SYMBOLS = A.SYMBOLS;
+
+  function sanitizeIdent(name) {
+    var s = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!s) s = "ELEMENT";
+    if (/^[0-9]/.test(s)) s = "E_" + s;
+    return s;
+  }
+  function identForChar(ch) {
+    if (/^[A-Za-z0-9]$/.test(ch)) return ch;
+    var found = SYMBOLS.find(function (s) { return s.ch === ch; });
+    return found ? found.id : "CH" + ch.charCodeAt(0);
+  }
+  function identToChar(ident) {
+    if (/^[A-Za-z0-9]$/.test(ident)) return ident;
+    var found = SYMBOLS.find(function (s) { return s.id === ident; });
+    return found ? found.ch : null;
+  }
+  function identToDisplay(ident) { return ident.toLowerCase().replace(/_/g, " "); }
+
+  function bitmaskBytes(sizeKey, cellSet) {
+    var cells = SIZES[sizeKey].cells;
+    var nBytes = Math.ceil(cells.length / 8);
+    var bytes = [];
+    for (var i = 0; i < nBytes; i++) bytes.push(0);
+    cells.forEach(function (c, i) {
+      if (cellSet.has(c.key)) bytes[i >> 3] |= (1 << (i & 7));
+    });
+    return bytes;
+  }
+  function bytesToHexList(bytes) {
+    return bytes.map(function (b) { return "0x" + b.toString(16).toUpperCase().padStart(2, "0"); }).join(", ");
+  }
+  function bytesTextToCells(bytesText, sizeKey) {
+    var byteRe = /0x([0-9A-Fa-f]{1,2})/g;
+    var bytes = [];
+    var bm;
+    while ((bm = byteRe.exec(bytesText))) bytes.push(parseInt(bm[1], 16));
+    var cells = SIZES[sizeKey].cells;
+    var result = [];
+    cells.forEach(function (c, i) {
+      if ((bytes[i >> 3] >> (i & 7)) & 1) result.push([c.q, c.r]);
+    });
+    return result;
+  }
+
+  /* ---------------- version manifest ---------------- */
+
+  function fnv1aHex(str) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ("00000000" + h.toString(16)).slice(-8);
+  }
+  function hashPairs(pairs) {
+    var sorted = (pairs || []).map(function (p) { return p[0] + "," + p[1]; }).sort();
+    return fnv1aHex(sorted.join(";"));
+  }
+  function currentHashes() {
+    var out = {};
+    ["xs", "md", "lg"].forEach(function (sk) {
+      Object.keys(data.font[sk]).forEach(function (ch) {
+        out["kFont_" + sk.toUpperCase() + "_" + identForChar(ch)] = hashPairs(data.font[sk][ch]);
+      });
+    });
+    Object.keys(data.elements).forEach(function (name) {
+      out["kElement_" + sanitizeIdent(name)] = hashPairs(data.elements[name]);
+    });
+    return out;
+  }
+
+  function friendlyName(ident) {
+    var m = ident.match(/^kFont_(XS|MD|LG)_(.+)$/);
+    if (m) {
+      var sizeLabel = { XS: "Small", MD: "Medium", LG: "Large" }[m[1]];
+      var ch = identToChar(m[2]);
+      var chLabel = ch === " " ? "space" : (ch != null ? "'" + ch + "'" : m[2]);
+      return chLabel + " (" + sizeLabel + ")";
+    }
+    var m2 = ident.match(/^kElement_(.+)$/);
+    if (m2) return identToDisplay(m2[1]);
+    return ident;
+  }
+
+  function buildManifestLines() {
+    var entries = [];
+    ["xs", "md", "lg"].forEach(function (sk) {
+      Object.keys(data.font[sk]).sort().forEach(function (ch) {
+        entries.push("kFont_" + sk.toUpperCase() + "_" + identForChar(ch) + "=" + hashPairs(data.font[sk][ch]));
+      });
+    });
+    Object.keys(data.elements).sort().forEach(function (name) {
+      entries.push("kElement_" + sanitizeIdent(name) + "=" + hashPairs(data.elements[name]));
+    });
+    var lines = [], row = "";
+    entries.forEach(function (entry) {
+      if (row.length && row.length + entry.length + 1 > 96) { lines.push("// " + row); row = ""; }
+      row += (row.length ? " " : "") + entry;
+    });
+    if (row) lines.push("// " + row);
+    return lines;
+  }
+
+  function renderExport() {
+    var lines = [];
+    var cur = currentHashes();
+    var prev = data.syncedHashes;
+    var changed = Object.keys(cur).filter(function (k) { return !prev || prev[k] !== cur[k]; });
+    var total = Object.keys(cur).length;
+
+    lines.push("// ==========================================================");
+    if (!prev) {
+      lines.push("// First export from this browser -- nothing to compare against yet.");
+    } else if (changed.length === 0) {
+      lines.push("// No changes since your last Copy. Nothing new to send.");
+    } else {
+      lines.push("// CHANGED SINCE LAST COPY (" + changed.length + " of " + total + "): " +
+        changed.map(friendlyName).join(", "));
+    }
+    lines.push("// lib-version: " + (data.libVersion || 0));
+    lines.push("// ==========================================================");
+    lines.push.apply(lines, buildManifestLines());
+    lines.push("// ==========================================================");
+    lines.push("// Bit i of a mask is entry i of that size's kHexCellQR_* table");
+    lines.push("// below (same order): axial (q,r) offset from the object's own");
+    lines.push("// center. Decode: (mask[i>>3] >> (i&7)) & 1, then place with the");
+    lines.push("// same rotateAxialSteps / axial.indexAtAxial pattern already used");
+    lines.push("// by drawHexGlyphSteps.");
+    lines.push("// ==========================================================");
+    lines.push("");
+
+    ["xs", "md", "lg"].forEach(function (sk) {
+      var sz = SIZES[sk];
+      lines.push("// " + sz.label + " cell table (radius " + sz.radius + ", " + sz.cells.length + " px)" +
+        (sk === "xs" ? " -- may already exist as kHexGlyphCellQR in firmware" : ""));
+      lines.push("const int8_t kHexCellQR_" + sk.toUpperCase() + "[" + sz.cells.length + "][2] = {");
+      var rows = [];
+      for (var i = 0; i < sz.cells.length; i += 10) {
+        rows.push("  " + sz.cells.slice(i, i + 10).map(function (c) { return "{" + c.q + "," + c.r + "}"; }).join(", ") +
+          (i + 10 < sz.cells.length ? "," : ""));
+      }
+      lines.push(rows.join("\n"));
+      lines.push("};");
+      lines.push("");
+    });
+
+    lines.push("// ---- Font glyphs ----");
+    ["xs", "md", "lg"].forEach(function (sk) {
+      var sz = SIZES[sk];
+      var chars = Object.keys(data.font[sk]).sort();
+      if (!chars.length) return;
+      lines.push("");
+      lines.push("// " + sz.label + " (" + sz.cells.length + " px, " + Math.ceil(sz.cells.length / 8) + " bytes/glyph)");
+      chars.forEach(function (ch) {
+        var set = A.pairsToSet(data.font[sk][ch]);
+        var bytes = bitmaskBytes(sk, set);
+        var ident = identForChar(ch);
+        lines.push("const uint8_t kFont_" + sk.toUpperCase() + "_" + ident + "[" + bytes.length + "] PROGMEM = { " +
+          bytesToHexList(bytes) + " }; // '" + (ch === " " ? "SPACE" : ch) + "'");
+      });
+    });
+
+    lines.push("");
+    lines.push("// ---- Elements (large, " + SIZES.lg.cells.length + " px, " + Math.ceil(SIZES.lg.cells.length / 8) + " bytes each) ----");
+    Object.keys(data.elements).sort().forEach(function (name) {
+      var set = A.pairsToSet(data.elements[name]);
+      var bytes = bitmaskBytes("lg", set);
+      lines.push("const uint8_t kElement_" + sanitizeIdent(name) + "[" + bytes.length + "] PROGMEM = { " +
+        bytesToHexList(bytes) + " }; // " + name);
+    });
+
+    document.getElementById("exportOut").value = lines.join("\n");
+  }
+
+  document.getElementById("copyExportBtn").addEventListener("click", function () {
+    var out = document.getElementById("exportOut");
+    out.select();
+    var ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(out.value); ok = true; }
+    } catch (e) { /* fall through */ }
+    if (!ok) { try { document.execCommand("copy"); ok = true; } catch (e2) { /* fall through */ } }
+    if (ok) {
+      data.syncedHashes = currentHashes();
+      A.saveStorage();
+      renderExport();
+    }
+    window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, ok ? "Export copied. This is now your sync baseline." : "Select the text above and copy manually.", ok ? "ok" : "warn");
+  });
+
+  function parseImport() {
+    var text = document.getElementById("importIn").value;
+    var added = 0;
+    var snapshotTaken = false;
+    function ensureSnapshot() { if (!snapshotTaken) { A.pushUndo(); snapshotTaken = true; } }
+
+    // legacy coordinate-list elements: const int8_t kElement_NAME[][2] = {...};
+    var reLegacy = /const\s+int8_t\s+kElement_(\w+)\s*\[\s*\]\s*\[\s*2\s*\]\s*=\s*\{([\s\S]*?)\};/g;
+    var m;
+    while ((m = reLegacy.exec(text))) {
+      var body = m[2];
+      var cells = [];
+      var pairRe = /\{\s*(-?\d+)\s*,\s*(-?\d+)\s*\}/g; // fresh per match -- lastIndex must not carry over
+      var pm;
+      while ((pm = pairRe.exec(body))) cells.push([parseInt(pm[1], 10), parseInt(pm[2], 10)]);
+      if (cells.length) { ensureSnapshot(); data.elements[identToDisplay(m[1])] = cells; added++; }
+    }
+
+    // bitmask elements: const uint8_t kElement_NAME[34] PROGMEM = { 0x.., ... };
+    var reElem = /const\s+uint8_t\s+kElement_(\w+)\s*\[\s*\d+\s*\]\s*(?:PROGMEM)?\s*=\s*\{([\s\S]*?)\};/g;
+    while ((m = reElem.exec(text))) {
+      var ecells = bytesTextToCells(m[2], "lg");
+      if (ecells.length) { ensureSnapshot(); data.elements[identToDisplay(m[1])] = ecells; added++; }
+    }
+
+    // bitmask font: const uint8_t kFont_XS_A[8] PROGMEM = { 0x.., ... };
+    var reFont = /const\s+uint8_t\s+kFont_(XS|MD|LG)_(\w+)\s*\[\s*\d+\s*\]\s*(?:PROGMEM)?\s*=\s*\{([\s\S]*?)\};/g;
+    while ((m = reFont.exec(text))) {
+      var sk = m[1].toLowerCase();
+      var ch = identToChar(m[2]);
+      if (ch != null) {
+        ensureSnapshot();
+        data.font[sk][ch] = bytesTextToCells(m[3], sk);
+        added++;
+      }
+    }
+
+    var statusEl = document.getElementById("importStatus");
+    if (added > 0) {
+      A.bumpVersion();
+      A.saveStorage();
+      window.__hexaForgeUI.renderLibrary();
+      window.__hexaForgeUI.updateCharGridCustomizedMarks();
+      renderExport();
+      statusEl.textContent = "Imported " + added + " object(s).";
+      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Imported " + added + " object(s).", "ok");
+    } else {
+      statusEl.textContent = "No recognized kFont_SIZE_CHAR[] or kElement_NAME[] arrays found.";
+      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Nothing recognized in that text.", "warn");
+    }
+  }
+
+  document.getElementById("parseImportBtn").addEventListener("click", parseImport);
+
+  document.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      // commit whatever's on the canvas first -- otherwise switching straight
+      // to Export without first switching character/element shows stale data
+      window.__hexaForgeUI.commitCurrent();
+      if (btn.dataset.tab === "export") renderExport();
+      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // safety net: capture an in-progress edit even if the user never clicks
+  // to another character/element/tab before closing or backgrounding the tab
+  window.addEventListener("beforeunload", function () { window.__hexaForgeUI.commitCurrent(); });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) window.__hexaForgeUI.commitCurrent();
+  });
+
+  /* ---------------- direct-to-disk save (patterns.h via the console server) ---------------- */
+
+  function loadFromServer() {
+    return fetch("/api/glyphs").then(function (r) { return r.json(); }).then(function (result) {
+      data.font = result.font;
+      data.elements = result.elements;
+      A.saveStorage();
+      var diskDot = document.getElementById("diskDirtyDot");
+      if (diskDot) diskDot.classList.remove("show");
+    });
+  }
+
+  function saveToServer() {
+    window.__hexaForgeUI.commitCurrent();
+    var btn = document.getElementById("saveToDeviceBtn");
+    if (btn) btn.disabled = true;
+    return fetch("/api/glyphs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ font: data.font, elements: data.elements }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (btn) btn.disabled = false;
+      if (j.error) throw new Error(j.error);
+      var diskDot = document.getElementById("diskDirtyDot");
+      if (diskDot) diskDot.classList.remove("show");
+      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Saved to patterns.h.", "ok");
+      var fsl = document.getElementById("fontStatusLine");
+      if (fsl) window.__hexaForgeUI.flash(fsl, "Saved to patterns.h.", "ok");
+    }).catch(function (e) {
+      if (btn) btn.disabled = false;
+      window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Save failed: " + e.message, "warn");
+    });
+  }
+  document.getElementById("saveToDeviceBtn").addEventListener("click", saveToServer);
+  window.addEventListener("beforeunload", function (e) {
+    window.__hexaForgeUI.commitCurrent();
+    if (document.getElementById("diskDirtyDot").classList.contains("show")) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  window.__hexaForgeIO = { renderExport: renderExport, parseImport: parseImport, loadFromServer: loadFromServer, saveToServer: saveToServer };
+
+  /* ---------------- init ---------------- */
+
+  // instant local baseline (avoids a blank flash while the server fetch is in
+  // flight) -- the server load right after overwrites this with the real,
+  // on-disk state, which is always the source of truth
+  A.loadStorage();
+  A.autoPopulate();
+  window.__hexaForgeUI.renderCharGrid();
+  window.__hexaForgeUI.renderLibrary();
+  window.__hexaForgeUI.updateCharGridCustomizedMarks();
+  window.__hexaForgeUI.refreshModeChrome();
+  A.applyActiveRadius(9);
+  A.loadCellsIntoCanvas([]);
+  A.updateCount();
+
+  loadFromServer().then(function () {
+    var libTag = document.getElementById("libVersionTag");
+    if (libTag) libTag.textContent = "v" + (data.libVersion || 0);
+    A.autoPopulate();
+    window.__hexaForgeUI.renderLibrary();
+    window.__hexaForgeUI.updateCharGridCustomizedMarks();
+    if (A.state.mode === "elements") {
+      A.loadCellsIntoCanvas(A.state.elementName ? data.elements[A.state.elementName] : []);
+    } else {
+      A.loadCellsIntoCanvas(data.font[A.state.sizeKey][A.state.ch]);
+    }
+    A.updateCount();
+    renderExport();
+    window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Loaded from patterns.h.", "ok");
+  }).catch(function (e) {
+    window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Couldn't reach the console server (" + e.message + ") -- showing last local copy.", "warn");
+    renderExport();
+  });
+})();
+</script>
+
+</body>
+</html>

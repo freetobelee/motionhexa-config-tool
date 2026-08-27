@@ -13,12 +13,14 @@ const { spawn } = require("child_process");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const MAIN_CPP = path.join(PROJECT_ROOT, "src", "main.cpp");
-const PORT = process.env.PORT ? Number(process.env.PORT) : 4173;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 2710; // 271 LEDs, x10 to stay above macOS's privileged-port line (<1024 needs admin rights)
 const PIO_ENV = "v5";
 
-// Files scanned for `@tunable("Label", min, max)` tags. Add a path here to
-// make its tagged constants show up in the Config panel -- no other code
-// change needed, the scanner is generic.
+// Files scanned for `@tunable("Label", min, max)` or `@tunable("Label", min,
+// max, "PatternName")` tags. Add a path here to make its tagged constants
+// show up in the Config/effect-settings panels -- no other code change
+// needed, the scanner is generic. The optional 4th argument ties a tunable
+// to a specific effect's settings page; omit it for a global/general setting.
 const TUNABLE_FILES = [
   path.join(PROJECT_ROOT, "src", "main.cpp"),
   path.join(PROJECT_ROOT, "src", "power.h"),
@@ -97,9 +99,182 @@ function writePatterns(newPatterns) {
   fs.writeFileSync(MAIN_CPP, result.join(eol), "utf8");
 }
 
+/* ---------------- glyphs / elements (Hexa Object Forge, saves straight to patterns.h) ---------------- */
+
+const PATTERNS_H = path.join(PROJECT_ROOT, "src", "patterns.h");
+
+const SIZES = {
+  xs: { count: 61, radius: 4, label: "Small" },
+  md: { count: 127, radius: 6, label: "Medium" },
+  lg: { count: 271, radius: 9, label: "Large" },
+};
+
+// must match the SYMBOLS table baked into the Hexa Object Forge tool exactly
+const SYMBOLS = [
+  { ch: " ", id: "SPACE" }, { ch: ".", id: "PERIOD" }, { ch: ",", id: "COMMA" },
+  { ch: ":", id: "COLON" }, { ch: ";", id: "SEMI" }, { ch: "!", id: "BANG" },
+  { ch: "?", id: "QMARK" }, { ch: "-", id: "DASH" }, { ch: "+", id: "PLUS" },
+  { ch: "=", id: "EQUALS" }, { ch: "/", id: "SLASH" }, { ch: "(", id: "LPAREN" },
+  { ch: ")", id: "RPAREN" }, { ch: "°", id: "DEGREE" }, { ch: "&", id: "AMP" },
+  { ch: "'", id: "APOS" },
+];
+
+function identForChar(ch) {
+  if (/^[A-Za-z0-9]$/.test(ch)) return ch;
+  const found = SYMBOLS.find(function (s) { return s.ch === ch; });
+  return found ? found.id : "CH" + ch.charCodeAt(0);
+}
+function identToChar(ident) {
+  if (/^[A-Za-z0-9]$/.test(ident)) return ident;
+  const found = SYMBOLS.find(function (s) { return s.id === ident; });
+  return found ? found.ch : null;
+}
+function sanitizeIdent(name) {
+  let s = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!s) s = "ELEMENT";
+  if (/^[0-9]/.test(s)) s = "E_" + s;
+  return s;
+}
+function identToDisplay(ident) { return ident.toLowerCase().replace(/_/g, " "); }
+
+function parseCellTable(text, name, count) {
+  const re = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\[" + count + "\\]\\[2\\]\\s*=\\s*\\{([\\s\\S]*?)\\};");
+  const m = text.match(re);
+  if (!m) throw new Error("Could not find cell table " + name + " in patterns.h");
+  const pairs = [];
+  const pairRe = /\{\s*(-?\d+)\s*,\s*(-?\d+)\s*\}/g;
+  let pm;
+  while ((pm = pairRe.exec(m[1]))) pairs.push([Number(pm[1]), Number(pm[2])]);
+  if (pairs.length !== count) throw new Error(name + ": expected " + count + " cells, found " + pairs.length);
+  return pairs;
+}
+
+function bytesToPairs(byteVals, cells) {
+  const out = [];
+  cells.forEach(function (c, i) {
+    const byteI = i >> 3, bitI = i & 7;
+    if (byteI < byteVals.length && ((byteVals[byteI] >> bitI) & 1)) out.push(c);
+  });
+  return out;
+}
+function pairsToBytes(pairs, cells) {
+  const nBytes = Math.ceil(cells.length / 8);
+  const bytes = new Array(nBytes).fill(0);
+  const set = new Set(pairs.map(function (p) { return p[0] + "," + p[1]; }));
+  cells.forEach(function (c, i) {
+    if (set.has(c[0] + "," + c[1])) bytes[i >> 3] |= (1 << (i & 7));
+  });
+  return bytes;
+}
+function bytesToHexList(bytes) {
+  return bytes.map(function (b) { return "0x" + b.toString(16).toUpperCase().padStart(2, "0"); }).join(", ");
+}
+
+function parseByteDecls(text, namePattern) {
+  const re = new RegExp("const\\s+uint8_t\\s+(" + namePattern + ")\\s*\\[\\s*(\\d+)\\s*\\]\\s*=\\s*\\{([^}]*)\\};", "g");
+  const out = {};
+  let m;
+  while ((m = re.exec(text))) {
+    out[m[1]] = m[3].split(",").map(function (s) { return s.trim(); }).filter(Boolean)
+      .map(function (s) { return parseInt(s, 16); });
+  }
+  return out;
+}
+
+function readGlyphs() {
+  const text = fs.readFileSync(PATTERNS_H, "utf8");
+  const cellTables = {
+    xs: parseCellTable(text, "kHexCellQR_XS", 61),
+    md: parseCellTable(text, "kHexCellQR_MD", 127),
+    lg: parseCellTable(text, "kHexCellQR_LG", 271),
+  };
+  const fontBytes = parseByteDecls(text, "kFont_(?:XS|MD|LG)_\\w+");
+  const elementBytes = parseByteDecls(text, "kElement_\\w+");
+
+  const font = { xs: {}, md: {}, lg: {} };
+  Object.keys(fontBytes).forEach(function (name) {
+    const m = name.match(/^kFont_(XS|MD|LG)_(\w+)$/);
+    if (!m) return;
+    const sk = m[1].toLowerCase();
+    const ch = identToChar(m[2]);
+    if (ch == null) return;
+    font[sk][ch] = bytesToPairs(fontBytes[name], cellTables[sk]);
+  });
+
+  const elements = {};
+  Object.keys(elementBytes).forEach(function (name) {
+    const m = name.match(/^kElement_(\w+)$/);
+    if (!m) return;
+    elements[identToDisplay(m[1])] = bytesToPairs(elementBytes[name], cellTables.lg);
+  });
+
+  return { cellTables: cellTables, font: font, elements: elements };
+}
+
+function writeGlyphs(font, elements) {
+  let text = fs.readFileSync(PATTERNS_H, "utf8");
+  const cellTables = {
+    xs: parseCellTable(text, "kHexCellQR_XS", 61),
+    md: parseCellTable(text, "kHexCellQR_MD", 127),
+    lg: parseCellTable(text, "kHexCellQR_LG", 271),
+  };
+  const existingFont = parseByteDecls(text, "kFont_(?:XS|MD|LG)_\\w+");
+  const existingElements = parseByteDecls(text, "kElement_\\w+");
+
+  function declLine(name, bytes, comment) {
+    return "const uint8_t " + name + "[" + bytes.length + "] = { " + bytesToHexList(bytes) + " }; // " + comment;
+  }
+  function replaceOrQueueInsert(name, line, insertQueue, afterAnchorRe) {
+    const declRe = new RegExp("const\\s+uint8_t\\s+" + name + "\\s*\\[\\s*\\d+\\s*\\]\\s*=\\s*\\{[^}]*\\};(?:[^\\n]*)?");
+    if (declRe.test(text)) {
+      text = text.replace(declRe, line);
+    } else {
+      insertQueue.push({ name: name, line: line, afterAnchorRe: afterAnchorRe });
+    }
+  }
+
+  const newInserts = { xs: [], md: [], lg: [], elements: [] };
+
+  ["xs", "md", "lg"].forEach(function (sk) {
+    Object.keys(font[sk] || {}).forEach(function (ch) {
+      const name = "kFont_" + sk.toUpperCase() + "_" + identForChar(ch);
+      const bytes = pairsToBytes(font[sk][ch], cellTables[sk]);
+      const label = ch === " " ? "SPACE" : "'" + ch + "'";
+      const line = declLine(name, bytes, label);
+      const existing = existingFont[name];
+      const changed = !existing || existing.length !== bytes.length || existing.some(function (b, i) { return b !== bytes[i]; });
+      if (changed) replaceOrQueueInsert(name, line, newInserts[sk]);
+    });
+  });
+  Object.keys(elements || {}).forEach(function (name0) {
+    const name = "kElement_" + sanitizeIdent(name0);
+    const bytes = pairsToBytes(elements[name0], cellTables.lg);
+    const line = declLine(name, bytes, name0);
+    const existing = existingElements[name];
+    const changed = !existing || existing.length !== bytes.length || existing.some(function (b, i) { return b !== bytes[i]; });
+    if (changed) replaceOrQueueInsert(name, line, newInserts.elements);
+  });
+
+  // insert brand-new glyphs/elements right after the last existing declaration of the same kind
+  function insertAfterLast(matchRe, lines) {
+    if (!lines.length) return;
+    let lastEnd = -1, m, re = new RegExp(matchRe.source, "g");
+    while ((m = re.exec(text))) lastEnd = m.index + m[0].length;
+    if (lastEnd === -1) throw new Error("Could not find an anchor to insert new declarations near (pattern: " + matchRe + ")");
+    const block = "\n" + lines.map(function (l) { return l.line; }).join("\n");
+    text = text.slice(0, lastEnd) + block + text.slice(lastEnd);
+  }
+  insertAfterLast(/const\s+uint8_t\s+kFont_XS_\w+\s*\[\s*\d+\s*\]\s*=\s*\{[^}]*\};[^\n]*/, newInserts.xs);
+  insertAfterLast(/const\s+uint8_t\s+kFont_MD_\w+\s*\[\s*\d+\s*\]\s*=\s*\{[^}]*\};[^\n]*/, newInserts.md);
+  insertAfterLast(/const\s+uint8_t\s+kFont_LG_\w+\s*\[\s*\d+\s*\]\s*=\s*\{[^}]*\};[^\n]*/, newInserts.lg);
+  insertAfterLast(/const\s+uint8_t\s+kElement_\w+\s*\[\s*\d+\s*\]\s*=\s*\{[^}]*\};[^\n]*/, newInserts.elements);
+
+  fs.writeFileSync(PATTERNS_H, text, "utf8");
+}
+
 /* ---------------- @tunable config scanner ---------------- */
 
-const TUNABLE_RE = /=\s*(-?\d+(?:\.\d+)?)\s*;.*@tunable\(\s*"([^"]+)"\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/;
+const TUNABLE_RE = /=\s*(-?\d+(?:\.\d+)?)\s*;.*@tunable\(\s*"([^"]+)"\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*(?:,\s*"([^"]+)"\s*)?\)/;
 
 function scanTunables() {
   const out = [];
@@ -118,6 +293,7 @@ function scanTunables() {
         value: Number(m[1]),
         min: Number(m[3]),
         max: Number(m[4]),
+        pattern: m[5] || null,
       });
     });
   });
@@ -188,7 +364,11 @@ function readBody(req) {
   });
 }
 
-const MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css" };
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+};
 
 const server = http.createServer(function (req, res) {
   const url = new URL(req.url, "http://localhost");
@@ -212,6 +392,15 @@ const server = http.createServer(function (req, res) {
         sendJson(res, 200, { ok: true, tunables: scanTunables() });
       }).catch(function (e) { sendJson(res, 400, { error: e.message }); });
     }
+    if (req.method === "GET" && url.pathname === "/api/glyphs") {
+      return sendJson(res, 200, readGlyphs());
+    }
+    if (req.method === "POST" && url.pathname === "/api/glyphs") {
+      return readBody(req).then(function (body) {
+        writeGlyphs(body.font, body.elements);
+        sendJson(res, 200, { ok: true, glyphs: readGlyphs() });
+      }).catch(function (e) { sendJson(res, 400, { error: e.message }); });
+    }
     if (req.method === "POST" && url.pathname === "/api/build") {
       return runPio(["run", "-e", PIO_ENV], res);
     }
@@ -233,7 +422,11 @@ const server = http.createServer(function (req, res) {
   }
 });
 
-server.listen(PORT, function () {
-  console.log("Motionhexa console running at http://localhost:" + PORT);
-  console.log("Project root: " + PROJECT_ROOT);
-});
+if (require.main === module) {
+  server.listen(PORT, function () {
+    console.log("Motionhexa console running at http://localhost:" + PORT);
+    console.log("Project root: " + PROJECT_ROOT);
+  });
+}
+
+module.exports = { readGlyphs, writeGlyphs, parsePatterns, writePatterns, scanTunables, writeTunable, PATTERNS_H, MAIN_CPP };
