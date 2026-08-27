@@ -5630,119 +5630,131 @@ public:
   }
   static int strLen(const char *s) { int n = 0; while (s[n]) n++; return n; }
 
-  int phase = 0; // 0=Small scroll, 1=Medium scroll, 2=Large scroll, 3=flip through every glyph
-  float autoQ = 0;   // monotonic baseline -- always creeps forward, drives phase advance
-  float flipPos = 0;
-  vector32 smoothAcc;
-  bool jumpFired = false; // one jump per tilt episode, not one per frame
+  // 6 physical faces, same clock-hour naming and angle math WorkoutTimer
+  // uses for its 3 -- 8/6/4 pick a scroll size, 12/2/10 all pick the
+  // glyph flip-through. Which face is "down" both selects the mode AND
+  // orients that mode's display to read upright on that face.
+  static const int kFaceCount = 6;
+  const int kFaceHour[kFaceCount] = {12, 2, 4, 6, 8, 10};
+  const float kClockRotationOffset = M_PI; // reused from AnalogClock/SolarSystem/WorkoutTimer
+  float faceAngle[kFaceCount];
+  int faceRotSteps[kFaceCount];
 
-  // small S/M/L marker row along the top of the display -- lit interface
-  // showing (and, via a firm tilt, letting you jump directly between) the
-  // three scroll phases
-  PixelIndex markerPixels[3];
+  const float kFlatnessThreshold = 0.7f; // same WorkoutTimer constants: |az|/mag above this = flat, not on any face
+  const float kFaceConfidence = 0.5f;
+  const float kFaceMargin = 0.05f;
+
+  int lockedFace = 4; // index into kFaceHour -- starts on 8 (Small) until a real face is detected
+  vector32 smoothAcc;
+  float autoQ = 0;
+  float flipPos = 0;
+
+  bool isFlipFace(int f) { return kFaceHour[f] == 12 || kFaceHour[f] == 2 || kFaceHour[f] == 10; }
+
+  int computeFaceRotationSteps(float angle) {
+    float delta = angle + (float)M_PI / 2.0f;
+    int steps = (int)roundf(delta / (float)(M_PI / 3.0));
+    return ((steps % 6) + 6) % 6;
+  }
+
   ScrollingFontTest() {
-    vectorf targets[3] = { vectorf(-3.0f, 8.0f), vectorf(0.0f, 8.5f), vectorf(3.0f, 8.0f) };
-    for (int m = 0; m < 3; ++m) {
-      PixelIndex best = 0;
-      float bestD = 1e9f;
-      for (PixelIndex px = 0; px < LED_COUNT; ++px) {
-        vectorf r = axial.rectFromPixelIndex(px);
-        float dx = r.x - targets[m].x, dy = r.y - targets[m].y;
-        float d = dx * dx + dy * dy;
-        if (d < bestD) { bestD = d; best = px; }
-      }
-      markerPixels[m] = best;
+    for (int i = 0; i < kFaceCount; ++i) {
+      faceAngle[i] = M_PI / 2 - kFaceHour[i] * (M_PI / 6) + kClockRotationOffset;
+      faceRotSteps[i] = computeFaceRotationSteps(faceAngle[i]);
     }
   }
 
-  // signed front/back tilt, -1..1 (same az/mag convention RickRoll's
-  // playback-speed tilt uses)
-  float tiltFrontBack() {
+  // which face is down, if any is confidently down at all -- exact same
+  // dot-product-argmax-with-margin technique as WorkoutTimer's 3-face
+  // version, generalized to 6. Only ever REASSIGNS lockedFace on a genuine
+  // detection; lying flat (or an ambiguous read) leaves it exactly where it
+  // was, so the mode "remains that way if the device is put on its back."
+  void updateLockedFace() {
     ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
     vector32 acc(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
-    smoothAcc = (6 * smoothAcc + acc) / 7;
+    smoothAcc = (10 * smoothAcc + acc) / 11;
+    float ax = smoothAcc.x, ay = smoothAcc.y, az = smoothAcc.z;
+    float mag = sqrtf(ax * ax + ay * ay + az * az);
+    float flatness = (mag > 1) ? fabsf(az) / mag : 1.0f;
+    if (mag <= 1 || flatness >= kFlatnessThreshold) return;
+
+    float vals[kFaceCount];
+    for (int i = 0; i < kFaceCount; ++i) vals[i] = (ax * cosf(faceAngle[i]) + ay * sinf(faceAngle[i])) / mag;
+    int best = 0;
+    for (int i = 1; i < kFaceCount; ++i) if (vals[i] > vals[best]) best = i;
+    float second = -1e9f;
+    for (int i = 0; i < kFaceCount; ++i) if (i != best && vals[i] > second) second = vals[i];
+    if (vals[best] > kFaceConfidence && vals[best] - second > kFaceMargin && best != lockedFace) {
+      lockedFace = best;
+      autoQ = 0;
+      flipPos = 0;
+    }
+  }
+
+  // clock-style speed control: a small dead zone (near-flat = exactly the
+  // constant base rate), then a cubic ease toward a top multiplier -- same
+  // shape as AnalogClock's own tilt ramp, just with a much smaller working
+  // tilt range so it stays well clear of the tilt needed to actually swap
+  // faces above. Tilting toward the scroll direction speeds it up; tilting
+  // the other way eases back through a full stop and reverses.
+  float speedMultiplierFromTilt() {
+    const float kTiltThreshold = 0.12f;
+    const float kMaxEffectiveTilt = 0.55f;
+    const float kTopSpeedMultiplier = 8.0f;
+    const float kBottomSpeedMultiplier = -6.0f;
     float mag = sqrtf((float)smoothAcc.x * smoothAcc.x + (float)smoothAcc.y * smoothAcc.y + (float)smoothAcc.z * smoothAcc.z);
-    return (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0.0f;
+    float tilt = (mag > 1) ? constrain(smoothAcc.z / mag, -1.0f, 1.0f) : 0.0f;
+    float absT = fabsf(tilt);
+    if (absT <= kTiltThreshold) return 1.0f;
+    float t = constrain((absT - kTiltThreshold) / (kMaxEffectiveTilt - kTiltThreshold), 0.0f, 1.0f);
+    float eased = t * t * t;
+    return (tilt > 0) ? (1.0f + eased * (kTopSpeedMultiplier - 1.0f)) : (1.0f - eased * (1.0f - kBottomSpeedMultiplier));
   }
 
   void update() {
     ctx.leds.fill_solid(CRGB::Black);
-    float tilt = tiltFrontBack();
-    const float kDeadzone = 0.05f;
-    const float kJumpThreshold = 0.55f;
+    updateLockedFace();
+    float speedMultiplier = speedMultiplierFromTilt();
     // hue fade runs off the wall clock, not scroll/flip position, so it
     // stays a steady, pleasant cycle no matter what tilt is doing
     CRGB color = CHSV((uint8_t)(millis() / 32), 0xFF, 0xFF);
+    int rotSteps = faceRotSteps[lockedFace];
 
-    // a firm, held tilt jumps straight to the next/previous size (S/M/L
-    // only -- the flip finale is still reached by finishing a Large lap),
-    // one jump per tilt episode so it doesn't rapid-fire while held
-    bool strongTilt = fabsf(tilt) > kJumpThreshold;
-    if (!strongTilt) {
-      jumpFired = false;
-    } else if (!jumpFired) {
-      jumpFired = true;
-      if (phase <= 2) {
-        phase = (phase + (tilt > 0 ? 1 : -1) + 3) % 3;
-        autoQ = 0;
-      }
-    }
-
-    if (phase < 3) {
+    if (isFlipFace(lockedFace)) {
+      const char *chars = flipChars();
+      int nChars = strLen(chars);
+      const float kCharsPerSec = 2.0f;
+      flipPos += kCharsPerSec * speedMultiplier * frameTime() / 1000.0f;
+      int idx = ((int)flipPos) % nChars;
+      if (idx < 0) idx += nChars;
+      const uint8_t *mask = hexBitmaskGlyphForCharLG(chars[idx]);
+      int minQ, maxQ;
+      hexBitmaskQBounds(mask, kHexCellQR_LG, 271, minQ, maxQ);
+      drawHexBitmaskSteps(ctx, mask, kHexCellQR_LG, 271, -(minQ + maxQ) / 2, 0, rotSteps, color);
+    } else {
       const uint8_t *(*glyphFn)(char);
       const int8_t (*cellQR)[2];
       int cellCount;
-      float qPerSec, pitch, scrubRange;
-      bool kerned = (phase == 2); // Large keeps real per-glyph kerning; Small/Medium are fixed-pitch
-      switch (phase) {
-        case 0: glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  qPerSec = 2.0f; pitch = 6.0f;  scrubRange = 48.0f; break;
-        case 1: glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; qPerSec = 3.0f; pitch = 9.0f;  scrubRange = 72.0f; break;
-        default: glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; qPerSec = 4.5f; pitch = 0.0f; scrubRange = 90.0f; break;
-      }
+      float pitch; // also doubles as an "average character width" for the chars/sec->q/sec conversion below
+      bool kerned;
+      int hour = kFaceHour[lockedFace];
+      if (hour == 8) { glyphFn = hexBitmaskGlyphForChar;   cellQR = kHexCellQR_XS; cellCount = 61;  pitch = 6.0f;  kerned = false; }
+      else if (hour == 6) { glyphFn = hexBitmaskGlyphForCharMD; cellQR = kHexCellQR_MD; cellCount = 127; pitch = 9.0f;  kerned = false; }
+      else { glyphFn = hexBitmaskGlyphForCharLG; cellQR = kHexCellQR_LG; cellCount = 271; pitch = 10.0f; kerned = true; }
+
       const char *word = text();
       int wordLen = strLen(word);
       const float kLoopGap = 24.0f; // blank run between the tail and the next lap
       float totalWidth = bitmaskWordWidthAtSize(word, wordLen, glyphFn, cellQR, cellCount, kerned, pitch) + kLoopGap;
 
-      // autoQ is the monotonic baseline (idle creep, always forward -- this
-      // is what advances phases on a completed lap). Tilt beyond the
-      // deadzone adds a directly-mapped offset on top for precise scrubbing:
-      // no momentum, no drift -- return to flat and the offset snaps to zero.
-      autoQ += qPerSec * frameTime() / 1000.0f;
-      if (autoQ >= totalWidth) {
-        autoQ -= totalWidth;
-        phase = (phase + 1) % 4;
-        if (phase == 3) flipPos = 0;
-      }
-      float scrubOffset = (fabsf(tilt) <= kDeadzone) ? 0.0f : tilt * scrubRange;
-      float scrollQ = autoQ + scrubOffset;
-      scrollQ = fmodf(scrollQ, totalWidth);
-      if (scrollQ < 0) scrollQ += totalWidth;
+      const float kBaseCharsPerSec = 1.5f;
+      float qPerSec = kBaseCharsPerSec * pitch;
+      autoQ += qPerSec * speedMultiplier * frameTime() / 1000.0f;
+      autoQ = fmodf(autoQ, totalWidth);
+      if (autoQ < 0) autoQ += totalWidth;
 
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
-      drawBitmaskWordAtSize(ctx, word, wordLen, -scrollQ + totalWidth, 0, 0, color, glyphFn, cellQR, cellCount, kerned, pitch);
-    } else {
-      // finale: flip through every glyph one at a time, centered and large;
-      // same tilt convention, but as a direct speed (not scrub) since a
-      // one-at-a-time flip has no useful "position" to scrub through
-      const char *chars = flipChars();
-      int nChars = strLen(chars);
-      const float kCharsPerSec = 2.2f;
-      float dirMult = (fabsf(tilt) <= kDeadzone) ? 1.0f : 1.0f + tilt * 6.0f;
-      flipPos += kCharsPerSec * dirMult * frameTime() / 1000.0f;
-      if (flipPos >= nChars) { flipPos -= nChars; phase = 0; autoQ = 0; }
-      else if (flipPos < 0) { flipPos += nChars; }
-
-      const uint8_t *mask = hexBitmaskGlyphForCharLG(chars[(int)flipPos]);
-      int minQ, maxQ;
-      hexBitmaskQBounds(mask, kHexCellQR_LG, 271, minQ, maxQ);
-      drawHexBitmaskSteps(ctx, mask, kHexCellQR_LG, 271, -(minQ + maxQ) / 2, 0, 0, color);
-    }
-
-    // S/M/L marker row: the active size glows in the scroll color, the
-    // other two stay dim -- also shows where a firm tilt will jump to
-    for (int m = 0; m < 3; ++m) {
-      ctx.leds[markerPixels[m]] = (phase == m) ? color : CRGB(20, 20, 20);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -autoQ, 0, rotSteps, color, glyphFn, cellQR, cellCount, kerned, pitch);
+      drawBitmaskWordAtSize(ctx, word, wordLen, -autoQ + totalWidth, 0, rotSteps, color, glyphFn, cellQR, cellCount, kerned, pitch);
     }
   }
 
