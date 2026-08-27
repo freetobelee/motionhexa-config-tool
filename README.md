@@ -1,184 +1,128 @@
-# motionhexa
+# Motionhexa Config Tool
 
-PCB designs and code for a motion-reactive, battery-powered hexagonal glowy object. 
+A local, zero-install browser tool for editing a [motionhexa](https://www.tindie.com/products/starduststorm/the-hexagon/) — a motion-reactive, battery-powered hexagonal LED sculpture — without touching C++. Manage which patterns run, paint custom pixel fonts, tune device settings, and build & flash the firmware, all from one page in your browser.
+
+This repo is the Config Tool first, and a firmware fork second: it bundles the full motionhexa firmware (originally by [starduststorm](https://github.com/starduststorm/motionhexa)) plus a couple dozen new LED patterns, mostly built to give the tool something real to edit and show off.
 
 > This repository's descriptions and day-to-day upkeep are managed collaboratively with [Claude](https://claude.com) (Anthropic).
 
-<img src="doc/assets/hexa_front.jpg" alt="photo of motionhexa pixels panel" height=400>
-<img src="doc/assets/hexa_back_assembled.jpg" alt="photo of back of assembled motionhexa" height=400>
+<img src="doc/assets/hexa_front.jpg" alt="photo of motionhexa pixels panel" height="320">
+<img src="doc/assets/hexa_back_assembled.jpg" alt="photo of back of assembled motionhexa" height="320">
 
-# The Object
+## What it does
 
-It is a hexagon. Colors swirl & shift as you move it. Pixels fall towards the earth. The triangle stays put. USB-C Rechargable.
+- **Programs** — enable/disable and drag-to-reorder the pattern rotation, with a live thumbnail per pattern and a settings panel for anything it exposes (speed, particle count, audio sensitivity, etc.)
+- **Fonts & Elements** — a full pixel editor for the hex-grid font and icon set used by on-device text, at three sizes (Small/Medium/Large)
+- **System** — device name, default brightness, and charge-indicator style
+- **Build & Deploy** — compiles with PlatformIO and flashes the connected device, streamed live, from the header of every page
 
-## Controls
+Every edit writes straight to the real source files (`src/main.cpp`, `src/patterns.h`) — there's no separate config format to keep in sync. New settings just need a trailing tag comment (`@tunable`, `@tunable_text`, `@tunable_enum`, `@thumbnail`) on the constant they control; see [Adding a setting](#adding-a-setting) below.
 
-There is a button on that back of an assembled hexa that you can press by squeezing through the front and back of the case for a single click. 
-* Single click: Next Pattern
-* Double click: Previous Pattern
-* Long (1-second) squeeze: Power on and off
-* Very long (10-second) squeeze: Soft reset
+## Quick start
 
-## Config Tool
+Requires [Node.js](https://nodejs.org) (no npm install — the server has zero dependencies) and, for Build/Deploy, [PlatformIO](https://platformio.org)'s `pio` CLI.
 
-A local browser tool (`console/`) for editing programs, fonts, and device
-settings without touching code directly — enable/reorder/configure
-patterns, paint custom glyphs, tweak brightness and the charge-indicator
-style, then Build and Deploy straight to the device. Zero install: run
-`node console/server.js`, or just double-click
-`console/Start Console.command`. Full details in
-[console/README.md](console/README.md).
-
-## Hardware
-
-* RP2040 dual-core ARM processor
-* ICM-20948 motion sensor
-* LMD4030 PDM microphone
-* BQ27421 battery monitor
-* SK9822-EC20 pixels
-* LP28013HQVF lipo charger
-
-### Disabled Hardware
-
-* An ALS-PT19-315 ambient light sensor for use in autobrightness that is disabled since its response time is too slow (likely load capacitance too high) to be able to subtract out the the light from nearby pixels during patterns. It may be able to do one-shot autobrigthness during the startup animation.
-* An MT3608-based 5V boost circuit. The hexa is running with no color-loss issues directly on lipo voltage, so the boost circuit is disabled.
-
-### Hardware errata
-
-* v5: An issue where the charging ring will remain after unplugging the hexa due to unexpected voltage on the VBUS line. Mitgated in 1e0326c by fully powering off when device is manually turned off.
-
-# Project layout
-
-* hexacontroller/ contains the pcb for the logic, power, and motion circuitry.
-* hexa/ contains the pcb for the hexagonal lattice of 271 *SK9822-EC20* pixels wired in zig-zag order
-* src/ all project-specific source
-* lib/ submodule dependencies *dustlib* and *BQ27427 Battery Fuel Gauge*
-
-The project is built using [PlatformIO] in Visual Studio Code.
-
-## Building
-
-Build the v5 environment in the [PlatformIO] project, which corresponds to the MakerFaire2025 hardware.
-
-You will likely need to run
 ```
-git submodule update --init
+git clone --recurse-submodules https://github.com/freetobelee/motionhexa.git
+cd motionhexa
+node console/server.js
 ```
-in the source after ```git clone``` in order to fetch the submodules for building.
 
-### Libraries & Dependencies
-PlatformIO should fetch the apprpriate version of each dependency on first build.
+Then open `http://localhost:2710`. On macOS you can also just double-click `console/Start Console.command`.
 
-* [FastLED] - A library for fast 8-bit math and rendering colors onto pixels
-* [SparkFun_ICM-20948] - A library for interfacing with the ICM-20948 Motion sensor
-* [edrean/BQ27427 Battery Fuel Gauge] - A library for interfacing with the BQ27421 (very similar to BQ27427) battery monitor (PlatformIO should build against my *BQ27427 Battery Fuel Gauge* fork)
-* [dustlib], my work-in-progress pixel library
+## Adding a setting
 
-## How to write patterns
+Four tag kinds, all trailing comments on the constant's own line — the scanner is generic, so a new tag of an existing kind needs no server code changes. It currently reads `main.cpp`, `power.h`, and `patterns.h`.
 
-### Please be aware that modifying the code is at your own risk
+```cpp
+// Slider — general Config panel, or a specific program's settings with a 4th arg
+const int kTriBounceSpeed = 70; // @tunable("Speed", 10, 200, "TriBounce")
 
-Pattern code is in [src/patterns.h](https://github.com/starduststorm/motionhexa/blob/main/src/patterns.h)
+// Text field — System tab only
+const char *kDeviceName = "motionhexa"; // @tunable_text("Device Name")
 
-You can write your own new pattern by subclassing *Pattern*.
+// Labeled choice — an int that's really an index into named options
+const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
 
-```C
-class MyAwesomePatternIdea : public Pattern {
+// Thumbnail — on a pattern's own class line, real colors from its own code
+class TriBounce : public BouncyPixels { // @thumbnail("#FF0000", "#80FF00", "#00FFFF", "#8000FF")
+```
+
+If the value you want to tag is an inline literal (a constructor argument, say) rather than a named constant, pull it out into one first.
+
+## Writing a new pattern
+
+Subclass `Pattern` in `src/patterns.h`:
+
+```cpp
+class MyAwesomePattern : public Pattern {
 public:
-  MyAwesomePatternIdea() { }
   void update() {
-    // Example 1: Show a rainbow down the zig-zag pixel wiring of the hexa
     for (int px = 0; px < ctx.leds.size(); ++px) {
-      CRGB color = CHSV(10 * px - millis()/10, 0xFF, 0xFF);
-      ctx.leds[px] = color;
+      ctx.leds[px] = CHSV(10 * px - millis() / 10, 0xFF, 0xFF);
     }
-
-    // Example 2: Show a rainbow pulsing outwards from the center using axial coordinates
-    /*
-    Axial centerAxial = axial.axialFromPixelIndex(ctx.leds.size()/2);
-    for (int px = 0; px < ctx.leds.size(); ++px) {
-      Axial ax = axial.axialFromPixelIndex(px);
-      // the sum of the differences of q,r,s gives us the "cube distance" which in 2d is shaped like a hexagon
-      int distanceToCenter = abs(ax.q() - centerAxial.q()) + abs(ax.r() - centerAxial.r()) + abs(ax.s() - centerAxial.s());
-      CRGB color = CHSV(20 * distanceToCenter - millis()/5, 0xFF, 0xFF);
-      ctx.leds[px] = color;
-    }
-    */
-
-    // Example 3: Show a small hexagon that moves around are you tilt the hexa
-    /*
-    // get the acceleometer reading for this frame, scale it down, then convert it into axial coordinates
-    auto acceleration = MotionManager::motionFrame.agmt.acc.axes;
-    float accScale = 1000;
-    fAxial accOffset = axial.rectToHex(vectorT<float>(acceleration.y/accScale, -acceleration.x/accScale), 1);
-    // then get the center pixel axial and offset it by the acceleration axial
-    fAxial centerAx = axial.axialFromPixelIndex(ctx.leds.size()/2);
-    fAxial circleAx(centerAx.q() + accOffset.q(), centerAx.r() + accOffset.r());
-    // finally, draw a small hexagonal shape centered around this point
-    float circleSize = 6;
-    for (PixelIndex px = 0; px < LED_COUNT; ++px) {
-      fAxial ax = axial.axialFromPixelIndex(px);
-      float distance = fabs(circleAx.q() - ax.q()) + fabs(circleAx.r() - ax.r()) + fabs(circleAx.s() - ax.s());
-      uint8_t brightness = constrain(0xFF - 0xFF * distance/circleSize, 0, 0xFF);
-      ctx.leds[px] = CHSV(0,0,brightness);
-    }
-    */
   }
-  const char *description() {
-    // This is the name of the pattern that will be printed onto the serial console
-    return "MyAwesomePatternIdea";
-  }
+  const char *description() { return "MyAwesomePattern"; }
 };
-
 ```
 
-Each pattern needs to be added to the pattern list in main.cpp [here](https://github.com/starduststorm/motionhexa/blob/main/src/main.cpp#L304). in order to run.
-You can add your own pattern by adding a line to the list where you find *patternManager.registerPattern*.
+Then register it in `src/main.cpp`'s `setup()`:
+
+```cpp
+patternManager.registerPattern<MyAwesomePattern>();
 ```
-void setup() {
-  # ...
-  patternManager.registerPattern<MyAwesomePatternIdea>();
-  # ...
-}
+
+It'll show up in the Config Tool's Programs list automatically. Registration order is playback order.
+
+## Building the firmware
+
+Built with [PlatformIO](https://platformio.org) — build the `v5` environment, which targets the MakerFaire2025 hardware revision.
+
 ```
-This list defines the order that patterns run when you click the button.
+git submodule update --init --recursive
+pio run -e v5
+```
 
-### USBBOOT (help my hexa won't boot)
+Dependencies ([FastLED], [SparkFun_ICM-20948], [edrean/BQ27427 Battery Fuel Gauge], [dustlib]) are fetched automatically on first build.
 
-If your hexagon stops doing hexagon things while you are hacking on it, does not respond to power cycle, and you are unable to re-flash it, you can put it into DFU mode using rp2040 USBBOOT.
+### Recovering a device that won't boot
 
-* Carefully open the case using a flat, blunt tool, avoiding poking the battery. 
-* There is a button on the hexacontroller here:
-* <img src="doc/assets/usb_boot.jpg" alt="location of USBBOOT button" height=200>
+If the hexa stops responding and won't re-flash normally, put it into RP2040 USBBOOT mode:
 
-* Press and hold the button while plugging into a computer-attached usb port. You should see a drive (USB Mass Storage Device) appear called "RPI-RP2". 
-* You can now either re-flash the hexa yourself using PlatformIO or another tool
-OR
-* Copy the stable binary hexa image from [here](bin/hexa-v5-firmware@ed502d04.uf2) onto the drive, and after the copy it should automatically reboot.
+1. Carefully open the case with a flat, blunt tool, avoiding the battery.
+2. Find the USBBOOT button on the hexacontroller board:
+   <img src="doc/assets/usb_boot.jpg" alt="location of USBBOOT button" height="180">
+3. Hold it while plugging into USB — a "RPI-RP2" mass-storage drive should appear.
+4. Either re-flash with PlatformIO, or copy [the stable release binary](bin/hexa-v5-firmware@ed502d04.uf2) onto the drive; it reboots automatically once the copy finishes.
 
-## Roadmap
+## The hardware
 
-Rough plans for the Config Tool, in no particular order:
+RP2040 dual-core ARM, ICM-20948 motion sensor, LMD4030 PDM microphone, BQ27421 battery monitor, SK9822-EC20 pixels, USB-C rechargeable via an LP28013HQVF lipo charger. PCB sources are in `hexacontroller/` (logic/power/motion) and `hexa/` (the 271-pixel hex lattice).
 
-* Add contextual instructions to the programs that need them (Clock, Solar
-  System)
-* Remove the "Saved" indicator text in the Fonts & Elements tool
-* Make thumbnails real visual representations of what each program
-  actually looks like, not just a color swatch
-* Double-check the audio sensitivity setting actually works on the
-  droplet programs
-* Add a way to define which physical face is "the bottom" per program,
-  for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
-* The hex-font glyph library (used by the Fonts & Elements tool and
-  programs like the font test) is still incomplete — a number of
-  characters are still generic auto-generated defaults rather than
-  hand-designed
+A physical button (squeeze through the case) controls it directly: single click for next pattern, double click for previous, a 1-second hold to power on/off, a 10-second hold for a soft reset.
 
-## Document is a work in progress
-(More details to come!)
+<details>
+<summary>Disabled hardware &amp; known errata</summary>
+
+- An ALS-PT19-315 ambient light sensor for autobrightness is disabled — its response time is too slow to subtract out light from nearby pixels during patterns. Might still work for a one-shot brightness read at startup.
+- An MT3608-based 5V boost circuit is disabled — the pixels show no color-loss issues running directly on lipo voltage.
+- **v5 errata:** the charging ring can remain lit after unplugging due to unexpected voltage on VBUS. Mitigated in `1e0326c` by fully powering off when the device is manually turned off.
+
+</details>
+
+## Roadmap / project direction
+
+Config Tool:
+- Add contextual instructions to the programs that need them (Clock, Solar System)
+- Remove the "Saved" indicator text in the Fonts & Elements tool
+- Make thumbnails real visual representations of what each program actually looks like, not just a color swatch
+- Double-check the audio sensitivity setting actually works on the droplet programs
+- Add a way to define which physical face is "the bottom" per program, for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
+
+Firmware:
+- The hex-font glyph library (used by the Fonts & Elements tool and programs like the font test) is still incomplete — a number of characters are still generic auto-generated defaults rather than hand-designed
 
 [FastLED]: https://github.com/FastLED/FastLED
-[PlatformIO]: <https://platformio.org>
-[SparkFun_ICM-20948]: <https://github.com/sparkfun/SparkFun_ICM-20948_ArduinoLibrary>
-[edrean/BQ27427 Battery Fuel Gauge]: <https://github.com/edreanernst/BQ27427_Arduino_Library>
-[dustlib]: <https://github.com/starduststorm/dustlib>
+[SparkFun_ICM-20948]: https://github.com/sparkfun/SparkFun_ICM-20948_ArduinoLibrary
+[edrean/BQ27427 Battery Fuel Gauge]: https://github.com/edreanernst/BQ27427_Arduino_Library
+[dustlib]: https://github.com/starduststorm/dustlib
