@@ -506,7 +506,7 @@ const uint8_t kFont_MD_3[16] = { 0x00, 0x00, 0x30, 0x80, 0x00, 0x84, 0x40, 0x88,
 const uint8_t kFont_MD_4[16] = { 0x00, 0x00, 0x00, 0x10, 0xC0, 0x00, 0x4A, 0x20, 0x07, 0x32, 0xD0, 0x82, 0x01, 0x00, 0x00, 0x00 }; // '4'
 const uint8_t kFont_MD_5[16] = { 0x00, 0x00, 0x30, 0x80, 0x20, 0x04, 0x43, 0x50, 0x08, 0x89, 0x90, 0x84, 0x1C, 0x02, 0x00, 0x00 }; // '5'
 const uint8_t kFont_MD_6[16] = { 0x00, 0x00, 0x3C, 0x8C, 0x50, 0x84, 0x44, 0x88, 0x08, 0x91, 0x10, 0x87, 0x00, 0x06, 0x00, 0x00 }; // '6'
-const uint8_t kFont_MD_7[16] = { 0x00, 0x00, 0x00, 0x80, 0x00, 0x02, 0x10, 0x08, 0x01, 0x11, 0x90, 0x80, 0x02, 0x06, 0x00, 0x00 }; // '7'
+const uint8_t kFont_MD_7[16] = { 0x00, 0x00, 0x00, 0x80, 0x00, 0x82, 0x10, 0x08, 0x01, 0x11, 0x90, 0x80, 0x02, 0x06, 0x00, 0x00 }; // '7'
 const uint8_t kFont_MD_8[16] = { 0x00, 0x00, 0x38, 0x90, 0x40, 0x04, 0x47, 0x90, 0x08, 0x91, 0x90, 0x87, 0x03, 0x00, 0x00, 0x00 }; // '8'
 const uint8_t kFont_MD_9[16] = { 0x00, 0x00, 0x30, 0x80, 0x70, 0x84, 0x44, 0x88, 0x08, 0x91, 0x10, 0x85, 0x18, 0x1E, 0x00, 0x00 }; // '9'
 
@@ -1112,19 +1112,35 @@ public:
     }
   }
 
+  // converts a "local" (X toward 3, Y toward 12) point into the true final
+  // axial cell -- same theta12/theta3 rotation drawLocalPixelInto uses,
+  // pulled out so it can give drawDigitGlyphInto ONE target point per digit
+  // rather than one per lit pixel (see below for why that distinction matters)
+  Axial localToAxial(float localX, float localY) {
+    float theta12 = M_PI/2 + kClockRotationOffset;
+    float theta3 = theta12 - M_PI/2;
+    vectorT<float> rectPos(localX * cosf(theta3) + localY * cosf(theta12), localX * sinf(theta3) + localY * sinf(theta12));
+    return axial.rectToHex(rectPos, 1.0).cubeRound();
+  }
+
   // draws one Small hex-font digit (the real hand-customized set from the
   // Fonts & Elements tool, not a generic rect font) centered at local
-  // (centerX, centerY). Reuses drawLocalPixelInto per lit cell, so the whole
-  // glyph shape rotates and lands correctly in the dial's own rotated frame
-  // exactly like the hands/markers do -- no separate rotation step needed.
+  // (centerX, centerY). Converts local->axial ONCE for the digit's center,
+  // then places the whole glyph with drawHexBitmaskSteps' exact integer
+  // rotation (rotSteps=3 == kClockRotationOffset's 180deg, applied the same
+  // way RickRoll/WorkoutTimer already rotate glyph content to match a
+  // physical resting orientation) -- NOT by converting each lit pixel
+  // through rect space independently and re-rounding to the nearest hex
+  // cell, which can snap cells that are adjacent in the source glyph to
+  // non-adjacent final cells. That was the actual bug: some digits (worst
+  // on '7') came out broken, and inconsistently between the hour and
+  // minute rows, because the two rows' rect offsets landed on different
+  // rounding boundaries.
   void drawDigitGlyphInto(PixelStorage<LED_COUNT> &buf, int digit, float centerX, float centerY, CRGB color) {
     if (digit < 0 || digit > 9) return;
-    const uint8_t *mask = hexBitmaskDigitXS(digit);
-    for (int i = 0; i < 61; ++i) {
-      if (!((mask[i >> 3] >> (i & 7)) & 1)) continue;
-      vectorf cellRect = axial.hexToRect(fAxial((float)kHexCellQR_XS[i][0], (float)kHexCellQR_XS[i][1]), 1.0f);
-      drawLocalPixelInto(buf, centerX + cellRect.x, centerY + cellRect.y, color);
-    }
+    const int kRotSteps = 3; // kClockRotationOffset (pi) is exactly 3 hex 60deg steps
+    Axial target = localToAxial(centerX, centerY);
+    drawHexBitmaskSteps(buf, hexBitmaskDigitXS(digit), kHexCellQR_XS, 61, -target.q(), -target.r(), kRotSteps, color);
   }
 
   // two Small digits (tens, ones) side by side, centered at local Y=centerY --
@@ -3228,7 +3244,7 @@ public:
 // center using the medium digit font), 2 = Pie Fill (a clock-style wedge
 // sweeps out from the top proportional to charge, filled with a slowly
 // animating color gradient)
-const int kChargeIndicatorStyle = 1; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
+const int kChargeIndicatorStyle = 2; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
 
 class ChargingPattern : public Pattern {
 public:
