@@ -42,7 +42,7 @@ const unsigned long kStallLogMS = 15; // ~3 motion frames' worth
 
 #define MEASURE_PHOTO_SENSOR_BASELINE false
 PhotoSensorBrightness *autoBrightness;
-const uint8_t kDefaultBrightness = 15; // @tunable("Default Brightness", 1, 255)
+const uint8_t kDefaultBrightness = 15; // @tunable("Default Brightness", 1, 20)
 
 DrawingContext ctx;
 HardwareControls controls;
@@ -390,7 +390,7 @@ void setup() {
   assert(ledgraph.adjList.size() == LED_COUNT, "adjlist size should match LED_COUNT");
 
   autoBrightness = new PhotoSensorBrightness(PHOTOSENSOR_READ_PIN, PHOTOSENSOR_POWER_PIN);
-  autoBrightness->maxBrightness = 20; // needs to be lowish or we will overheat @tunable("Auto-Brightness Cap", 1, 60)
+  autoBrightness->maxBrightness = 20; // needs to be lowish or we will overheat -- kept fixed, not user-tunable (see kDefaultBrightness's cap)
   autoBrightness->logChanges = true;
 
 #if MEASURE_PHOTO_SENSOR_BASELINE

@@ -700,7 +700,7 @@ public:
       ax *= mult;
       
       const int kAccScale = 20000;
-      const int kAmpScale = 600;
+      const int kAmpScale = 600; // @tunable("Audio Sensitivity (lower = more reactive)", 100, 2000, "PulseHexaSmooth")
       const int kLocScale = 2000000;
       // full static glitch with no fade
       // int glitchIt = (smoothAcc.z>0 ? (ax.q()*ax.r()*ax.s()) * smoothAcc.z/500000. : 0);
@@ -2390,9 +2390,11 @@ public:
   }
 };
 
+const int kTriBounceSpeed = 70; // @tunable("Speed", 10, 200, "TriBounce")
+
 class TriBounce : public BouncyPixels {
 public:
-  TriBounce() : BouncyPixels(3, 70, 0xFF, 2) {
+  TriBounce() : BouncyPixels(3, kTriBounceSpeed, 0xFF, 2) {
   }
   void update() {
     BouncyPixels::update();
@@ -2407,18 +2409,22 @@ public:
   }
 };
 
+const int kPixelDustCount = 60; // @tunable("Particle Count", 10, 271, "PixelDust")
+
 class PixelDust : public BouncyPixels {
 public:
-  PixelDust() : BouncyPixels(60, 70, 0xF4) {
+  PixelDust() : BouncyPixels(kPixelDustCount, 70, 0xF4) {
   }
   const char *description() {
     return "PixelDust";
   }
 };
 
+const int kPixelSandCount = 60; // @tunable("Particle Count", 10, 271, "PixelSand")
+
 class PixelSand : public BouncyPixels {
 public:
-  PixelSand() : BouncyPixels(60, 70, 0xC0) {
+  PixelSand() : BouncyPixels(kPixelSandCount, 70, 0xC0) {
   }
   const char *description() {
     return "PixelSand";
@@ -3111,7 +3117,7 @@ class SoundBits : public SoundPattern, public PaletteRotation<CRGBPalette256> {
 public:
   ParticleSim<LED_COUNT> particles;
 
-  int bitLoudZoom = 70;
+  int bitLoudZoom = 70; // @tunable("Audio Sensitivity", 10, 255, "SoundBits")
 
   SoundBits() : particles(ledgraph, ctx, 0, 0, 1200, {clockwise, counterclockwise}) {
     minBrightness = 20;
