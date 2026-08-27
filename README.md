@@ -2,6 +2,8 @@
 
 PCB designs and code for a motion-reactive, battery-powered hexagonal glowy object. 
 
+> This repository's descriptions and day-to-day upkeep are managed collaboratively with [Claude](https://claude.com) (Anthropic).
+
 <img src="doc/assets/hexa_front.jpg" alt="photo of motionhexa pixels panel" height=400>
 <img src="doc/assets/hexa_back_assembled.jpg" alt="photo of back of assembled motionhexa" height=400>
 
@@ -16,6 +18,16 @@ There is a button on that back of an assembled hexa that you can press by squeez
 * Double click: Previous Pattern
 * Long (1-second) squeeze: Power on and off
 * Very long (10-second) squeeze: Soft reset
+
+## Config Tool
+
+A local browser tool (`console/`) for editing programs, fonts, and device
+settings without touching code directly — enable/reorder/configure
+patterns, paint custom glyphs, tweak brightness and the charge-indicator
+style, then Build and Deploy straight to the device. Zero install: run
+`node console/server.js`, or just double-click
+`console/Start Console.command`. Full details in
+[console/README.md](console/README.md).
 
 ## Hardware
 
@@ -143,6 +155,20 @@ If your hexagon stops doing hexagon things while you are hacking on it, does not
 * You can now either re-flash the hexa yourself using PlatformIO or another tool
 OR
 * Copy the stable binary hexa image from [here](bin/hexa-v5-firmware@ed502d04.uf2) onto the drive, and after the copy it should automatically reboot.
+
+## Roadmap
+
+Rough plans for the Config Tool, in no particular order:
+
+* Add contextual instructions to the programs that need them (Clock, Solar
+  System)
+* Remove the "Saved" indicator text in the Fonts & Elements tool
+* Make thumbnails real visual representations of what each program
+  actually looks like, not just a color swatch
+* Double-check the audio sensitivity setting actually works on the
+  droplet programs
+* Add a way to define which physical face is "the bottom" per program,
+  for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
 
 ## Document is a work in progress
 (More details to come!)

@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
 
-const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
+const PROJECT_ROOT = path.resolve(__dirname, "..");
 const MAIN_CPP = path.join(PROJECT_ROOT, "src", "main.cpp");
 const PORT = process.env.PORT ? Number(process.env.PORT) : 2710; // 271 LEDs, x10 to stay above macOS's privileged-port line (<1024 needs admin rights)
 const PIO_ENV = "v5";

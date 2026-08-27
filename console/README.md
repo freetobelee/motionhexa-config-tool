@@ -12,7 +12,7 @@ Terminal window and your browser automatically.
 
 **Or from a terminal:**
 ```
-node tools/console/server.js
+node console/server.js
 ```
 Then open http://localhost:2710 in your browser. Leave the terminal window
 open while you use it — closing it (or Ctrl+C) stops the server.
@@ -66,20 +66,17 @@ any particular page to compile or flash.
 - **Brightness** — capped at the fixed hardware-safe ceiling; that ceiling
   itself isn't user-adjustable (it exists to keep the board from
   overheating).
-- **Charge Indicator** — pick between two visual styles for how the device
-  shows charging progress while plugged in (Ring: fills proportional to
-  charge from the USB port; Pulse: the whole outer edge breathes at a
-  brightness set by charge level). Adding a third style means writing the
-  actual animation in `ChargingPattern` (`src/patterns.h`) and adding its
-  name to the `@tunable_enum` options list — see below.
+- **Charge Indicator** — pick between four visual styles for how the device
+  shows charging progress while plugged in (Gradient Fill, Percentage, Pie
+  Fill, Original). Adding another style means writing the actual animation
+  in `ChargingPattern` (`src/patterns.h`) and adding its name to the
+  `@tunable_enum` options list — see below.
 
 ### Fonts & Elements (`/forge.html`)
 
 The full Hexa Object Forge pixel editor for the font/element bitmaps, saving
 straight to `src/patterns.h` — no more copying giant text blocks through
-chat. Paint, hit **Save to patterns.h**, done. The Export/Import tabs are
-still there as a manual fallback (e.g. to hand someone a text copy) but
-aren't needed for normal use anymore.
+chat. Paint, hit **Save to patterns.h**, done.
 
 ## Adding a new setting
 
@@ -109,7 +106,7 @@ const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Ring"
 ```
 
 **Thumbnail**, on a pattern's own `class Name : ...  {` line — 1 or more
-real hex colors sourced from that pattern's own code (see the existing 21
+real hex colors sourced from that pattern's own code (see the existing
 tags in `patterns.h` for examples of what counts as "real": literal
 `CRGB`/`CHSV` values, actual gradient palette stops, or — only when nothing
 pattern-specific exists — a genuine sample from the shared palette pool the
