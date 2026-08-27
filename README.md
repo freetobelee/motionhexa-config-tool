@@ -169,6 +169,10 @@ Rough plans for the Config Tool, in no particular order:
   droplet programs
 * Add a way to define which physical face is "the bottom" per program,
   for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
+* The hex-font glyph library (used by the Fonts & Elements tool and
+  programs like the font test) is still incomplete — a number of
+  characters are still generic auto-generated defaults rather than
+  hand-designed
 
 ## Document is a work in progress
 (More details to come!)
