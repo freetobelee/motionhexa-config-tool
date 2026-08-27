@@ -114,7 +114,8 @@ const SYMBOLS = [
   { ch: " ", id: "SPACE" }, { ch: ".", id: "PERIOD" }, { ch: ",", id: "COMMA" },
   { ch: ":", id: "COLON" }, { ch: ";", id: "SEMI" }, { ch: "!", id: "BANG" },
   { ch: "?", id: "QMARK" }, { ch: "-", id: "DASH" }, { ch: "+", id: "PLUS" },
-  { ch: "=", id: "EQUALS" }, { ch: "/", id: "SLASH" }, { ch: "\\", id: "BACKSLASH" }, { ch: "(", id: "LPAREN" },
+  { ch: "=", id: "EQUALS" }, { ch: "%", id: "PERCENT" },
+  { ch: "/", id: "SLASH" }, { ch: "\\", id: "BACKSLASH" }, { ch: "(", id: "LPAREN" },
   { ch: ")", id: "RPAREN" }, { ch: "°", id: "DEGREE" }, { ch: "&", id: "AMP" },
   { ch: "'", id: "APOS" },
 ];
