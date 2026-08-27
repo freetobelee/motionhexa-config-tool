@@ -1143,22 +1143,30 @@ public:
     drawHexBitmaskSteps(buf, hexBitmaskDigitXS(digit), kHexCellQR_XS, 61, -target.q(), -target.r(), kRotSteps, color);
   }
 
-  // two Small digits (tens, ones) side by side, centered at local Y=centerY --
-  // spacing is derived from each digit's own real ink width (via
-  // hexBitmaskQBounds), then kerned -1px (the two digits' facing edges
-  // overlap by one pixel) -- always keep this negative for a 2-wide
-  // centered Small pair, same convention drawTwoSmallDigits uses elsewhere
+  // two Small digits (tens, ones) side by side, centered at local Y=centerY.
+  // Deliberately NOT edge/ink-width kerning here (that's still correct for
+  // running text, e.g. ScrollingFontTest's Large pass) -- for a centered
+  // digit PAIR, every slot needs to be the same width regardless of which
+  // digit lands in it, or a narrow one like '1' (much less ink than '0'/'8')
+  // gets pulled in toward center and reads as sitting in the wrong spot
+  // relative to its neighbor. So both slots use one shared canvas width --
+  // the widest ink bounds across all 10 digits, all still measured from the
+  // same shared origin every digit is already authored against -- recomputed
+  // live (not hardcoded) so it stays right if the glyphs themselves change.
   void drawTwoDigitInto(PixelStorage<LED_COUNT> &buf, int value, float centerY, CRGB color) {
-    const float kDigitGap = -1.0f; // local-X gap between the two digits' facing edges (negative = overlap)
+    const float kDigitGap = -1.0f; // local-X gap between the two canvas slots' facing edges (negative = overlap)
     int tens = (value / 10) % 10, ones = value % 10;
-    int tensMinQ, tensMaxQ, onesMinQ, onesMaxQ;
-    hexBitmaskQBounds(hexBitmaskDigitXS(tens), kHexCellQR_XS, 61, tensMinQ, tensMaxQ);
-    hexBitmaskQBounds(hexBitmaskDigitXS(ones), kHexCellQR_XS, 61, onesMinQ, onesMaxQ);
+    int canvasMinQ = 127, canvasMaxQ = -127;
+    for (int d = 0; d <= 9; ++d) {
+      int minQ, maxQ;
+      hexBitmaskQBounds(hexBitmaskDigitXS(d), kHexCellQR_XS, 61, minQ, maxQ);
+      canvasMinQ = min(canvasMinQ, minQ);
+      canvasMaxQ = max(canvasMaxQ, maxQ);
+    }
     vectorf qUnit = axial.hexToRect(fAxial(1.0f, 0.0f), 1.0f); // local-X distance one q-step covers
-    float tensWidth = (tensMaxQ - tensMinQ) * qUnit.x;
-    float onesWidth = (onesMaxQ - onesMinQ) * qUnit.x;
-    drawDigitGlyphInto(buf, tens, -kDigitGap / 2.0f - tensWidth / 2.0f, centerY, color);
-    drawDigitGlyphInto(buf, ones,  kDigitGap / 2.0f + onesWidth / 2.0f, centerY, color);
+    float canvasWidth = (canvasMaxQ - canvasMinQ) * qUnit.x;
+    drawDigitGlyphInto(buf, tens, -kDigitGap / 2.0f - canvasWidth / 2.0f, centerY, color);
+    drawDigitGlyphInto(buf, ones,  kDigitGap / 2.0f + canvasWidth / 2.0f, centerY, color);
   }
 
   // marker at the given clock fraction (0=12, 0.25=3, 0.5=6, 0.75=9): a solid
@@ -3244,7 +3252,7 @@ public:
 // center using the medium digit font), 2 = Pie Fill (a clock-style wedge
 // sweeps out from the top proportional to charge, filled with a slowly
 // animating color gradient)
-const int kChargeIndicatorStyle = 2; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
+const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Gradient Fill", "Percentage", "Pie Fill", "Original")
 
 class ChargingPattern : public Pattern {
 public:
