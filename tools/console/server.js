@@ -322,6 +322,123 @@ function writeTunable(id, value) {
   fs.writeFileSync(filePath, lines.join(eol), "utf8");
 }
 
+/* ---------------- @tunable_text (string constants) ---------------- */
+
+const TUNABLE_TEXT_RE = /=\s*"([^"]*)"\s*;.*@tunable_text\(\s*"([^"]+)"\s*\)/;
+
+function scanTextTunables() {
+  const out = [];
+  TUNABLE_FILES.forEach(function (filePath) {
+    if (!fs.existsSync(filePath)) return;
+    const text = fs.readFileSync(filePath, "utf8");
+    const lines = text.split(/\r\n|\n/);
+    lines.forEach(function (line, i) {
+      const m = line.match(TUNABLE_TEXT_RE);
+      if (!m) return;
+      out.push({
+        id: path.relative(PROJECT_ROOT, filePath) + ":" + (i + 1),
+        file: path.relative(PROJECT_ROOT, filePath),
+        line: i + 1,
+        label: m[2],
+        value: m[1],
+      });
+    });
+  });
+  return out;
+}
+
+function writeTextTunable(id, value) {
+  const parts = id.split(":");
+  const lineNum = Number(parts.pop());
+  const relFile = parts.join(":");
+  const filePath = path.resolve(PROJECT_ROOT, relFile);
+  if (!TUNABLE_FILES.includes(filePath)) throw new Error("Refusing to write to a file outside the tunable allowlist: " + relFile);
+  if (typeof value !== "string") throw new Error("Invalid text tunable value (must be a string): " + value);
+  if (/[\n\r"\\]/.test(value)) throw new Error("Text value can't contain quotes, backslashes, or newlines: " + JSON.stringify(value));
+
+  const text = fs.readFileSync(filePath, "utf8");
+  const eol = text.indexOf("\r\n") !== -1 ? "\r\n" : "\n";
+  const lines = text.split(/\r\n|\n/);
+  const idx = lineNum - 1;
+  if (idx < 0 || idx >= lines.length) throw new Error("Tunable line number out of range: " + id);
+  const line = lines[idx];
+  const m = line.match(TUNABLE_TEXT_RE);
+  if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable_text pattern -- refusing to write (did the file change?).");
+
+  const newLine = line.replace(/=\s*"[^"]*"\s*;/, '= "' + value + '";');
+  lines[idx] = newLine;
+  fs.writeFileSync(filePath, lines.join(eol), "utf8");
+}
+
+/* ---------------- @tunable_enum (labeled integer choices) ---------------- */
+
+const TUNABLE_ENUM_RE = /=\s*(-?\d+)\s*;.*@tunable_enum\(\s*"([^"]+)"\s*((?:,\s*"[^"]*"\s*)+)\)/;
+
+function scanEnumTunables() {
+  const out = [];
+  TUNABLE_FILES.forEach(function (filePath) {
+    if (!fs.existsSync(filePath)) return;
+    const text = fs.readFileSync(filePath, "utf8");
+    const lines = text.split(/\r\n|\n/);
+    lines.forEach(function (line, i) {
+      const m = line.match(TUNABLE_ENUM_RE);
+      if (!m) return;
+      const options = [];
+      const optRe = /"([^"]*)"/g;
+      let om;
+      while ((om = optRe.exec(m[3]))) options.push(om[1]);
+      out.push({
+        id: path.relative(PROJECT_ROOT, filePath) + ":" + (i + 1),
+        file: path.relative(PROJECT_ROOT, filePath),
+        line: i + 1,
+        label: m[2],
+        value: Number(m[1]),
+        options: options,
+      });
+    });
+  });
+  return out;
+}
+
+function writeEnumTunable(id, value) {
+  const parts = id.split(":");
+  const lineNum = Number(parts.pop());
+  const relFile = parts.join(":");
+  const filePath = path.resolve(PROJECT_ROOT, relFile);
+  if (!TUNABLE_FILES.includes(filePath)) throw new Error("Refusing to write to a file outside the tunable allowlist: " + relFile);
+  if (!Number.isInteger(value) || value < 0) throw new Error("Invalid enum tunable value (must be a non-negative integer index): " + value);
+
+  const text = fs.readFileSync(filePath, "utf8");
+  const eol = text.indexOf("\r\n") !== -1 ? "\r\n" : "\n";
+  const lines = text.split(/\r\n|\n/);
+  const idx = lineNum - 1;
+  if (idx < 0 || idx >= lines.length) throw new Error("Tunable line number out of range: " + id);
+  const line = lines[idx];
+  const m = line.match(TUNABLE_ENUM_RE);
+  if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable_enum pattern -- refusing to write (did the file change?).");
+
+  const newLine = line.replace(/=\s*-?\d+\s*;/, "= " + value + ";");
+  lines[idx] = newLine;
+  fs.writeFileSync(filePath, lines.join(eol), "utf8");
+}
+
+/* ---------------- @thumbnail (real per-pattern colors) ---------------- */
+
+function scanThumbnails() {
+  const text = fs.readFileSync(PATTERNS_H, "utf8");
+  const out = {};
+  const re = /class\s+(\w+)\s*:[^\n{]*\{\s*\/\/\s*@thumbnail\(([^)]*)\)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const colors = [];
+    const colorRe = /"(#[0-9A-Fa-f]{6})"/g;
+    let cm;
+    while ((cm = colorRe.exec(m[2]))) colors.push(cm[1]);
+    if (colors.length) out[m[1]] = colors;
+  }
+  return out;
+}
+
 /* ---------------- build / deploy (streamed) ---------------- */
 
 function runPio(args, res) {
@@ -375,21 +492,32 @@ const server = http.createServer(function (req, res) {
 
   try {
     if (req.method === "GET" && url.pathname === "/api/patterns") {
-      return sendJson(res, 200, { patterns: parsePatterns() });
+      return sendJson(res, 200, { patterns: parsePatterns(), thumbnails: scanThumbnails() });
     }
     if (req.method === "POST" && url.pathname === "/api/patterns") {
       return readBody(req).then(function (body) {
         writePatterns(body.patterns);
-        sendJson(res, 200, { ok: true, patterns: parsePatterns() });
+        sendJson(res, 200, { ok: true, patterns: parsePatterns(), thumbnails: scanThumbnails() });
       }).catch(function (e) { sendJson(res, 400, { error: e.message }); });
     }
     if (req.method === "GET" && url.pathname === "/api/config") {
-      return sendJson(res, 200, { tunables: scanTunables() });
+      return sendJson(res, 200, {
+        tunables: scanTunables(),
+        textTunables: scanTextTunables(),
+        enumTunables: scanEnumTunables(),
+      });
     }
     if (req.method === "POST" && url.pathname === "/api/config") {
       return readBody(req).then(function (body) {
         (body.updates || []).forEach(function (u) { writeTunable(u.id, Number(u.value)); });
-        sendJson(res, 200, { ok: true, tunables: scanTunables() });
+        (body.textUpdates || []).forEach(function (u) { writeTextTunable(u.id, String(u.value)); });
+        (body.enumUpdates || []).forEach(function (u) { writeEnumTunable(u.id, Number(u.value)); });
+        sendJson(res, 200, {
+          ok: true,
+          tunables: scanTunables(),
+          textTunables: scanTextTunables(),
+          enumTunables: scanEnumTunables(),
+        });
       }).catch(function (e) { sendJson(res, 400, { error: e.message }); });
     }
     if (req.method === "GET" && url.pathname === "/api/glyphs") {
@@ -429,4 +557,8 @@ if (require.main === module) {
   });
 }
 
-module.exports = { readGlyphs, writeGlyphs, parsePatterns, writePatterns, scanTunables, writeTunable, PATTERNS_H, MAIN_CPP };
+module.exports = {
+  readGlyphs, writeGlyphs, parsePatterns, writePatterns,
+  scanTunables, writeTunable, scanTextTunables, writeTextTunable, scanEnumTunables, writeEnumTunable,
+  scanThumbnails, PATTERNS_H, MAIN_CPP,
+};

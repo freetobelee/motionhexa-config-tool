@@ -1,26 +1,19 @@
 "use strict";
 
-var state = { patterns: [], tunables: [], dirty: false, openSettingsFor: null };
+var state = { patterns: [], thumbnails: {}, tunables: [], dirty: false, openSettingsFor: null };
 
 var patternListEl = document.getElementById("patternList");
-var configListEl = document.getElementById("configList");
 var dirtyDot = document.getElementById("dirtyDot");
 var logOut = document.getElementById("logOut");
-var toastEl = document.getElementById("toast");
-
-function toast(msg, kind) {
-  toastEl.textContent = msg;
-  toastEl.className = "toast show" + (kind ? " " + kind : "");
-  clearTimeout(toastEl._t);
-  toastEl._t = setTimeout(function () { toastEl.className = "toast"; }, 3200);
-}
 
 function setDirty(v) {
   state.dirty = v;
   dirtyDot.classList.toggle("show", v);
 }
 
-/* ---------------- deterministic abstract thumbnail per effect ---------------- */
+var DISCLOSURE_SVG = '<svg viewBox="0 0 10 6" xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 10,0 5,6" fill="currentColor"/></svg>';
+
+/* ---------------- real, per-program thumbnail (from @thumbnail colors) ---------------- */
 
 function hashStr(s) {
   var h = 0;
@@ -29,50 +22,39 @@ function hashStr(s) {
 }
 
 function thumbnailSvg(name) {
-  var h = hashStr(name);
-  var hue1 = h % 360;
-  var hue2 = (hue1 + 130 + ((h >> 6) % 100)) % 360;
-  var c1 = "hsl(" + hue1 + " 70% 55%)";
-  var c2 = "hsl(" + hue2 + " 70% 55%)";
-  var motif = (h >> 3) % 5;
-  var hexPoints = "15,1 28,8 28,22 15,29 2,22 2,8";
-  var inner = "";
-  if (motif === 0) { // scattered dots
-    var dots = [];
-    for (var i = 0; i < 6; i++) {
-      var a = (h >> (i * 3)) % 360 * Math.PI / 180;
-      var r = 4 + ((h >> (i * 2)) % 8);
-      var x = 15 + Math.cos(a) * r, y = 15 + Math.sin(a) * r;
-      dots.push('<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.2" fill="' + (i % 2 ? c1 : c2) + '"/>');
-    }
-    inner = dots.join("");
-  } else if (motif === 1) { // concentric rings
-    inner = '<circle cx="15" cy="15" r="10" fill="none" stroke="' + c1 + '" stroke-width="2"/>' +
-      '<circle cx="15" cy="15" r="4.5" fill="' + c2 + '"/>';
-  } else if (motif === 2) { // triangle
-    inner = '<polygon points="15,6 24,22 6,22" fill="' + c1 + '" opacity="0.85"/>' +
-      '<circle cx="15" cy="18" r="2.5" fill="' + c2 + '"/>';
-  } else if (motif === 3) { // diagonal stripes
-    inner = '<line x1="4" y1="24" x2="14" y2="4" stroke="' + c1 + '" stroke-width="3"/>' +
-      '<line x1="14" y1="26" x2="24" y2="6" stroke="' + c2 + '" stroke-width="3"/>';
-  } else { // glow circle
-    inner = '<circle cx="15" cy="15" r="9" fill="' + c1 + '"/>' +
-      '<circle cx="12" cy="12" r="3" fill="' + c2 + '" opacity="0.9"/>';
+  var colors = state.thumbnails[name];
+  var hexPoints = "23,1 43,12 43,34 23,45 3,34 3,12";
+  if (!colors || !colors.length) {
+    return '<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">' +
+      '<polygon points="' + hexPoints + '" fill="#191d27" stroke="#262b38"/></svg>';
   }
-  return '<svg viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">' +
-    '<polygon points="' + hexPoints + '" fill="#191d27" stroke="#262b38"/>' +
-    '<clipPath id="clip-' + h + '"><polygon points="' + hexPoints + '"/></clipPath>' +
-    '<g clip-path="url(#clip-' + h + ')">' + inner + '</g>' +
+  var h = hashStr(name);
+  var fills;
+  if (colors.length === 1) {
+    fills = '<rect x="0" y="0" width="46" height="46" fill="' + colors[0] + '"/>';
+  } else {
+    // evenly-spaced horizontal bands through the real color list -- a direct,
+    // literal swatch of that program's own colors, not a generated pattern
+    var bandH = 46 / colors.length;
+    fills = colors.map(function (c, i) {
+      return '<rect x="0" y="' + (i * bandH).toFixed(1) + '" width="46" height="' + (bandH + 0.5).toFixed(1) + '" fill="' + c + '"/>';
+    }).join("");
+  }
+  var clipId = "clip-" + h;
+  return '<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">' +
+    '<clipPath id="' + clipId + '"><polygon points="' + hexPoints + '"/></clipPath>' +
+    '<g clip-path="url(#' + clipId + ')">' + fills + '</g>' +
+    '<polygon points="' + hexPoints + '" fill="none" stroke="#262b38"/>' +
     '</svg>';
 }
 
-/* ---------------- patterns: drag-and-drop, settings ---------------- */
+/* ---------------- patterns: drag-and-drop, disclosure settings ---------------- */
 
 function displayOrder() {
-  // enabled patterns keep their relative order first, disabled ones sink to
+  // enabled programs keep their relative order first, disabled ones sink to
   // the bottom in their own relative order -- since we never mutate the
   // underlying array's order on toggle (only the `enabled` flag), a
-  // re-enabled pattern falls back into its original slot automatically.
+  // re-enabled program falls back into its original slot automatically.
   var enabled = state.patterns.filter(function (p) { return p.enabled; });
   var disabled = state.patterns.filter(function (p) { return !p.enabled; });
   return enabled.concat(disabled);
@@ -139,12 +121,13 @@ function renderPatterns() {
   order.forEach(function (p) {
     var li = document.createElement("li");
     li.className = "pattern-row" + (p.enabled ? "" : " disabled");
-    li.draggable = p.enabled;
     li.dataset.name = p.name;
 
     var grip = document.createElement("span");
-    grip.className = "grip";
-    grip.textContent = p.enabled ? "⠿" : "";
+    grip.className = "grip" + (p.enabled ? "" : " static");
+    grip.textContent = "⠿";
+    grip.title = "Drag to reorder";
+    grip.draggable = p.enabled;
 
     var thumb = document.createElement("span");
     thumb.className = "thumb";
@@ -164,13 +147,14 @@ function renderPatterns() {
     name.textContent = p.name;
 
     var myTunables = tunablesFor(p.name);
-    var settingsBtn = document.createElement("button");
-    settingsBtn.className = "settings-btn" + (myTunables.length ? " has-settings" : "");
-    settingsBtn.textContent = "⚙";
-    settingsBtn.title = myTunables.length ? "Settings" : "No adjustable settings for this effect";
-    settingsBtn.disabled = !myTunables.length;
-    settingsBtn.addEventListener("click", function () {
-      state.openSettingsFor = state.openSettingsFor === p.name ? null : p.name;
+    var isOpen = state.openSettingsFor === p.name;
+    var disclosure = document.createElement("button");
+    disclosure.className = "disclosure" + (myTunables.length ? " has-settings" : "") + (isOpen ? " open" : "");
+    disclosure.innerHTML = DISCLOSURE_SVG;
+    disclosure.title = myTunables.length ? "Settings" : "No adjustable settings for this program";
+    disclosure.disabled = !myTunables.length;
+    disclosure.addEventListener("click", function () {
+      state.openSettingsFor = isOpen ? null : p.name;
       renderPatterns();
     });
 
@@ -178,10 +162,10 @@ function renderPatterns() {
     li.appendChild(thumb);
     li.appendChild(cb);
     li.appendChild(name);
-    li.appendChild(settingsBtn);
+    li.appendChild(disclosure);
     patternListEl.appendChild(li);
 
-    if (state.openSettingsFor === p.name && myTunables.length) {
+    if (isOpen && myTunables.length) {
       var settingsDiv = document.createElement("div");
       settingsDiv.className = "effect-settings";
       renderConfigInto(settingsDiv, myTunables, function () { setDirty(true); });
@@ -189,12 +173,12 @@ function renderPatterns() {
     }
 
     if (p.enabled) {
-      li.addEventListener("dragstart", function (e) {
+      grip.addEventListener("dragstart", function (e) {
         dragSrcName = p.name;
         li.classList.add("dragging");
         e.dataTransfer.effectAllowed = "move";
       });
-      li.addEventListener("dragend", function () { li.classList.remove("dragging"); });
+      grip.addEventListener("dragend", function () { li.classList.remove("dragging"); });
       li.addEventListener("dragover", function (e) {
         if (!dragSrcName || dragSrcName === p.name) return;
         e.preventDefault();
@@ -225,13 +209,6 @@ function reorderByName(srcName, targetName) {
   renderPatterns();
 }
 
-/* ---------------- global config ---------------- */
-
-function renderConfig() {
-  var globals = state.tunables.filter(function (t) { return !t.pattern; });
-  renderConfigInto(configListEl, globals, function () { setDirty(true); });
-}
-
 /* ---------------- load / save ---------------- */
 
 function loadAll() {
@@ -240,11 +217,11 @@ function loadAll() {
     fetch("/api/config").then(function (r) { return r.json(); }),
   ]).then(function (results) {
     state.patterns = results[0].patterns;
+    state.thumbnails = results[0].thumbnails || {};
     state.tunables = results[1].tunables;
     renderPatterns();
-    renderConfig();
     setDirty(false);
-  }).catch(function (e) { toast("Load failed: " + e.message, "err"); });
+  }).catch(function (e) { window.toast("Load failed: " + e.message, "err"); });
 }
 
 document.getElementById("reloadBtn").addEventListener("click", function () {
@@ -263,57 +240,8 @@ document.getElementById("saveBtn").addEventListener("click", function () {
       .then(function (r) { return r.json(); }).then(function (j) { if (j.error) throw new Error(j.error); }),
   ]).then(function () {
     setDirty(false);
-    toast("Saved to disk. Build or Deploy to apply.", "ok");
-  }).catch(function (e) { toast("Save failed: " + e.message, "err"); });
-});
-
-/* ---------------- build / deploy (streamed) ---------------- */
-
-function streamAction(url, label) {
-  logOut.textContent = "";
-  var btns = [document.getElementById("buildBtn"), document.getElementById("deployBtn")];
-  btns.forEach(function (b) { b.disabled = true; });
-
-  fetch(url, { method: "POST" }).then(function (res) {
-    var reader = res.body.getReader();
-    var decoder = new TextDecoder();
-    var buf = "";
-
-    function pump() {
-      return reader.read().then(function (result) {
-        if (result.done) return;
-        buf += decoder.decode(result.value, { stream: true });
-        var chunks = buf.split("\n\n");
-        buf = chunks.pop();
-        chunks.forEach(function (chunk) {
-          var eventMatch = chunk.match(/^event: (\w+)\ndata: (.*)$/s);
-          if (!eventMatch) return;
-          var event = eventMatch[1];
-          var data = JSON.parse(eventMatch[2]);
-          if (event === "log") {
-            logOut.textContent += data;
-            logOut.scrollTop = logOut.scrollHeight;
-          } else if (event === "done") {
-            btns.forEach(function (b) { b.disabled = false; });
-            toast(label + (data.code === 0 ? " succeeded." : " failed (exit " + data.code + ")."), data.code === 0 ? "ok" : "err");
-          }
-        });
-        return pump();
-      });
-    }
-    return pump();
-  }).catch(function (e) {
-    logOut.textContent += "\n[connection error] " + e.message;
-    btns.forEach(function (b) { b.disabled = false; });
-  });
-}
-
-document.getElementById("buildBtn").addEventListener("click", function () {
-  streamAction("/api/build", "Build");
-});
-document.getElementById("deployBtn").addEventListener("click", function () {
-  if (!confirm("This will build and flash the physical device over USB. Continue?")) return;
-  streamAction("/api/deploy", "Deploy");
+    window.toast("Saved to disk. Build or Deploy to apply.", "ok");
+  }).catch(function (e) { window.toast("Save failed: " + e.message, "err"); });
 });
 
 loadAll();

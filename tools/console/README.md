@@ -23,7 +23,7 @@ open while you use it — closing it (or Ctrl+C) stops the server.
   (the LTS version). The double-click launcher will tell you plainly if it's
   missing instead of failing silently.
 - **PlatformIO's `pio` CLI** — only needed for the Build/Deploy buttons, not
-  for editing effects/config/fonts. Install with `pipx install platformio`
+  for editing programs/config/fonts. Install with `pipx install platformio`
   (or see [platformio.org](https://platformio.org)).
 - The project's git submodules need to be checked out —
   `git submodule update --init --recursive` from the project root — same
@@ -32,58 +32,96 @@ open while you use it — closing it (or Ctrl+C) stops the server.
 Nothing else is required. Cloning this repo fresh with
 `git clone --recurse-submodules <url>` handles the last point automatically.
 
-## What it does
+## The three tabs
 
-### Effects & Config (`/`)
+Build and Deploy are in the header on every tab, so you don't need to be on
+any particular page to compile or flash.
 
-- **Effects** — drag rows to reorder, check/uncheck to enable or disable a
-  pattern in the on-device rotation. This edits the
+### Programs (`/`)
+
+- Drag the **handle** (⠿, left of the thumbnail) to reorder. Check/uncheck to
+  enable or disable a program in the on-device rotation — this edits the
   `patternManager.registerPattern<...>()` calls in `src/main.cpp` directly.
-  Disabling a pattern doesn't delete its code, just skips it. Unchecking an
-  effect drops it to the bottom of the list; rechecking it snaps back to its
-  original spot — the underlying order never actually changes on toggle, only
-  the enabled flag, so nothing needs to "remember" a position.
-- **Per-effect settings** — the ⚙ button on a row opens that effect's own
-  tunables (e.g. TriBounce's speed, PixelDust/PixelSand's particle count,
-  audio sensitivity on the patterns that react to sound). Effects with
-  nothing exposed yet show a disabled ⚙.
-- **Thumbnails** — each effect gets a small abstract generated icon (colors
-  and shape derived from its name) so the list is easier to scan. These are
-  decorative, not a literal preview of the animation — there's no way to
-  render what a pattern actually looks like without running it on the device.
-- **Config** — general settings not tied to one effect (currently just
-  Default Brightness, capped at the fixed hardware-safe ceiling).
-- **Save changes** — writes your edits to the actual source files. Nothing
+  Disabling doesn't delete the code, just skips it. Unchecking a program
+  drops it to the bottom of the list; rechecking it snaps back to its
+  original spot — the underlying order never actually changes on toggle,
+  only the enabled flag, so nothing needs to "remember" a position.
+- The **disclosure triangle** on a row opens that program's own settings
+  (e.g. TriBounce's speed, PixelDust/PixelSand's particle count, audio
+  sensitivity on the programs that react to sound). Programs with nothing
+  exposed yet show a dimmed, disabled triangle.
+- **Thumbnails** are real per-program data, not generic placeholders: each
+  one is a swatch of that program's own actual colors — its literal
+  `CRGB`/`CHSV` constants, its own gradient palette stops, or (for the
+  handful of programs that just draw from the shared random palette
+  rotation with nothing of their own) a real sample from that same shared
+  palette pool. See `@thumbnail(...)` below to add or change one.
+- **Save changes** writes your edits to the actual source files. Nothing
   takes effect on the device until you Build or Deploy.
-- **Build only** — runs `pio run -e v5`, streaming live output below.
-- **Build & Deploy to device** — runs `pio run -e v5 -t upload` (asks you to
-  confirm first, since it flashes the physical device over USB).
+
+### System (`/system.html`)
+
+- **Device Name** — a friendly string reported over USB serial when the
+  device is asked to identify itself (handy if you own more than one hexa).
+- **Brightness** — capped at the fixed hardware-safe ceiling; that ceiling
+  itself isn't user-adjustable (it exists to keep the board from
+  overheating).
+- **Charge Indicator** — pick between two visual styles for how the device
+  shows charging progress while plugged in (Ring: fills proportional to
+  charge from the USB port; Pulse: the whole outer edge breathes at a
+  brightness set by charge level). Adding a third style means writing the
+  actual animation in `ChargingPattern` (`src/patterns.h`) and adding its
+  name to the `@tunable_enum` options list — see below.
 
 ### Fonts & Elements (`/forge.html`)
 
-The full Hexa Object Forge pixel editor for the font/element bitmaps, now
-saving straight to `src/patterns.h` — no more copying giant text blocks
-through chat. Paint, hit **Save to patterns.h**, done. The Export/Import tabs
-are still there as a manual fallback (e.g. to hand someone a text copy) but
+The full Hexa Object Forge pixel editor for the font/element bitmaps, saving
+straight to `src/patterns.h` — no more copying giant text blocks through
+chat. Paint, hit **Save to patterns.h**, done. The Export/Import tabs are
+still there as a manual fallback (e.g. to hand someone a text copy) but
 aren't needed for normal use anymore.
 
-## Adding a new tunable
+## Adding a new setting
 
-Tag any numeric constant with a trailing comment:
+Four tag kinds, all just trailing comments on the constant's own line — the
+scanner is generic, no server code changes needed for a new tag of a kind
+that already exists. It currently reads `main.cpp`, `power.h`, and
+`patterns.h` (see `TUNABLE_FILES` in `server.js` to add more files).
+
+**Slider**, for a numeric constant — shows in the general Config panel,
+or on a specific program's settings if you add its class name as a 4th
+argument:
 ```cpp
 const uint8_t kSomeValue = 42; // @tunable("Some Value", 0, 100)
-```
-It shows up in the general Config panel automatically — no server code
-changes needed. To tie it to a specific effect's settings page instead of the
-general panel, add a 4th argument matching that pattern's class name:
-```cpp
 const int kTriBounceSpeed = 70; // @tunable("Speed", 10, 200, "TriBounce")
 ```
-The scanner currently covers `main.cpp`, `power.h`, and `patterns.h` (see
-`TUNABLE_FILES` in `server.js` to add more files). If the constant is an
-inline literal (e.g. a constructor argument) rather than a named `const`,
-pull it out into a named constant first — see the TriBounce/PixelDust/
-PixelSand examples already in `patterns.h` for the pattern to copy.
+
+**Text field**, for a `const char *` string constant — System tab only:
+```cpp
+const char *kDeviceName = "motionhexa"; // @tunable_text("Device Name")
+```
+
+**Labeled choice**, for an `int` whose value is really an index into a
+fixed list of named options (branch on it in code, same as
+`kChargeIndicatorStyle` in `patterns.h`):
+```cpp
+const int kChargeIndicatorStyle = 0; // @tunable_enum("Charge Indicator", "Ring", "Pulse")
+```
+
+**Thumbnail**, on a pattern's own `class Name : ...  {` line — 1 or more
+real hex colors sourced from that pattern's own code (see the existing 21
+tags in `patterns.h` for examples of what counts as "real": literal
+`CRGB`/`CHSV` values, actual gradient palette stops, or — only when nothing
+pattern-specific exists — a genuine sample from the shared palette pool the
+pattern draws from):
+```cpp
+class TriBounce : public BouncyPixels { // @thumbnail("#FF0000", "#80FF00", "#00FFFF", "#8000FF")
+```
+
+If the value you want to tag is an inline literal (e.g. a constructor
+argument) rather than a named `const`, pull it out into a named constant
+first — see the TriBounce/PixelDust/PixelSand examples already in
+`patterns.h` for the pattern to copy.
 
 ## Safety notes
 
@@ -91,7 +129,7 @@ PixelSand examples already in `patterns.h` for the pattern to copy.
   <file>` same as any other change if something looks wrong. This project
   wasn't a git repo before this tool was added; it is now, specifically so
   console-driven edits are easy to inspect and revert.
-- The Effects panel only reorders/toggles patterns that are already present
+- The Programs panel only reorders/toggles patterns that are already present
   in `main.cpp`'s registration block — it refuses to write if the set of
   pattern names doesn't match exactly (protects against a stale browser tab
   clobbering a change made another way).

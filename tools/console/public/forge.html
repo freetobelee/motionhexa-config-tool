@@ -228,7 +228,7 @@
   footer.legend { margin-top: 22px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 12px; color: var(--text-faint); }
 
   /* ---- header actions: undo + version ---- */
-  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .nav-tabs { display: flex; gap: 8px; margin-right: 6px; }
   .nav-tab {
     font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.06em;
@@ -238,6 +238,27 @@
   }
   .nav-tab.active { color: var(--accent-lit); border-color: var(--accent-lit-soft); background: var(--surface-2); }
   .nav-tab:hover:not(.active) { color: var(--text); }
+  .build-deploy-group { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid var(--border-soft); }
+  .header-build-status { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); min-width: 90px; }
+  .btn-deploy { background: var(--danger); border-color: var(--danger); color: #1a0505; font-weight: 600; }
+  .btn-deploy:hover { background: #ff8787; border-color: #ff8787; }
+  .credits {
+    margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-soft);
+    display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap;
+    font-size: 12px; color: var(--text-faint);
+  }
+  .credits a { color: var(--text-dim); text-decoration: none; }
+  .credits a:hover { color: var(--accent-ui); text-decoration: underline; }
+  .credits .sep { color: var(--border); }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface-2); border: 1px solid var(--border); padding: 10px 18px; border-radius: 4px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+    font-family: var(--font-mono);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: var(--accent-lit); color: var(--accent-lit); }
+  .toast.err { border-color: var(--danger); color: var(--danger); }
   .lib-version {
     font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
     border: 1px solid var(--border-soft); border-radius: 3px; padding: 4px 7px;
@@ -297,13 +318,19 @@
     <p>One editor for the 271-LED hex canvas: paint full-screen elements or design a 3-tier font, saved straight into <code class="k">patterns.h</code>.</p>
     <div class="header-actions">
       <nav class="nav-tabs">
-        <a class="nav-tab" href="/">Effects &amp; Config</a>
+        <a class="nav-tab" href="/">Programs</a>
+        <a class="nav-tab" href="/system.html">System</a>
         <a class="nav-tab active" href="/forge.html">Fonts &amp; Elements</a>
       </nav>
       <span class="dirty-dot" id="diskDirtyDot" title="Unsaved changes not yet written to patterns.h"></span>
       <span class="lib-version" id="libVersionTag" title="Bumps on every save, delete, or import.">v1</span>
       <button class="btn btn-ghost btn-small btn-undo" id="undoBtn" title="Undo (⌘Z / Ctrl+Z)" disabled>↺ Undo</button>
       <button class="btn btn-primary btn-small" id="saveToDeviceBtn">Save to patterns.h</button>
+      <div class="build-deploy-group">
+        <span class="header-build-status" id="headerBuildStatus">Idle</span>
+        <button class="btn btn-small" id="buildBtn">Build</button>
+        <button class="btn btn-deploy btn-small" id="deployBtn">Deploy</button>
+      </div>
     </div>
   </header>
 
@@ -412,10 +439,21 @@
 
   <footer class="legend">
     <span>Grid mirrors the physical hex: radius 9, 271 LEDs, center = (0, 0).</span>
-    <span>Saved locally in this browser — export before you clear your history.</span>
-    <span>Switching character, size, or element auto-saves what you were editing.</span>
+    <span>"Save to patterns.h" writes straight to disk — nothing here depends on browser storage anymore.</span>
+    <span>Switching character, size, or element commits what you were editing into memory; only Save writes it to disk.</span>
+  </footer>
+
+  <footer class="credits">
+    <span>motionhexa by starduststorm</span>
+    <span class="sep">&middot;</span>
+    <a href="https://github.com/starduststorm/motionhexa" target="_blank" rel="noopener">Original project on GitHub</a>
+    <span class="sep">&middot;</span>
+    <a href="https://www.tindie.com/products/starduststorm/the-hexagon/" id="tindieLink" target="_blank" rel="noopener">Get one on Tindie</a>
   </footer>
 </div>
+
+<div id="toast" class="toast"></div>
+<script src="/shared.js"></script>
 
 <script>
 (function () {

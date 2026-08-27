@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Motionhexa Console</title>
+<title>Motionhexa Console — System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/style.css" />
@@ -14,8 +14,8 @@
       <div class="brand"><span class="mark">HEXA</span><h1>Console</h1></div>
       <div class="header-right">
         <nav class="nav-tabs">
-          <a class="nav-tab active" href="/">Programs</a>
-          <a class="nav-tab" href="/system.html">System</a>
+          <a class="nav-tab" href="/">Programs</a>
+          <a class="nav-tab active" href="/system.html">System</a>
           <a class="nav-tab" href="/forge.html">Fonts &amp; Elements</a>
         </nav>
         <span class="dirty-dot" id="dirtyDot" title="Unsaved changes"></span>
@@ -31,20 +31,29 @@
 
     <main>
       <section class="panel">
-        <div class="panel-head"><h2>Programs</h2></div>
+        <div class="panel-head"><h2>Device</h2></div>
         <div class="panel-body">
-          <p class="hint">Drag the handle to reorder. Unchecking a program skips it in the on-device rotation and drops it to the bottom of the list — it snaps back to its spot when rechecked. The disclosure triangle opens that program's own settings, if it has any.</p>
-          <ul id="patternList" class="pattern-list"></ul>
+          <p class="hint">A friendly name for this specific hexa, reported over USB serial when you ask it to identify itself — handy if you own more than one.</p>
+          <div id="nameConfig"></div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 20px;">
+        <div class="panel-head"><h2>Brightness</h2></div>
+        <div class="panel-body">
+          <p class="hint">Capped at the hardware-safe ceiling so the board doesn't overheat — that ceiling itself isn't adjustable here.</p>
+          <div id="brightnessConfig"></div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 20px;">
+        <div class="panel-head"><h2>Charge Indicator</h2></div>
+        <div class="panel-body">
+          <p class="hint">How the hexa shows charging progress while plugged in.</p>
+          <div id="chargeStyleConfig"></div>
         </div>
       </section>
     </main>
-
-    <section class="panel log-panel">
-      <div class="panel-head"><h2>Output</h2></div>
-      <div class="panel-body">
-        <pre id="logOut" class="log-out">Idle.</pre>
-      </div>
-    </section>
 
     <footer class="credits">
       <span>motionhexa by starduststorm</span>
@@ -58,6 +67,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/shared.js"></script>
-  <script src="/app.js"></script>
+  <script src="/system.js"></script>
 </body>
 </html>
