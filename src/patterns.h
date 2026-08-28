@@ -5606,7 +5606,7 @@ public:
         if (filled) {
           uint8_t hueJitter = (px * 47) % 11;
           uint8_t sparkle = sin8(px * 13 + nowMs / 90);
-          uint8_t v = 180 + sparkle / 14;
+          uint8_t v = 225 + sparkle / 16;
           ctx.leds[px] = CHSV(28 + hueJitter, 235, v);
         } else if (!isHaloPixel[px]) {
           // empty chamber space -- same tiled sky, much darker, reads as
