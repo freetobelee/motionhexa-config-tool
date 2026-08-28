@@ -70,14 +70,13 @@ Dependencies ([FastLED], [SparkFun_ICM-20948], [edrean/BQ27427 Battery Fuel Gaug
 ## Roadmap / project direction
 
 Config Tool:
-- Add contextual instructions to the programs that need them (Clock, Solar System)
 - Remove the "Saved" indicator text in the Fonts & Elements tool
 - Make thumbnails real visual representations of what each program actually looks like, not just a color swatch
 - Double-check the audio sensitivity setting actually works on the droplet programs
 - Add a way to define which physical face is "the bottom" per program, for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
 
 Firmware:
-- The hex-font glyph library (used by the Fonts & Elements tool and programs like the font test) is still incomplete — a number of characters are still generic auto-generated defaults rather than hand-designed
+- The hex-font glyph library (used by the Fonts & Elements tool and programs like the font test) is complete — every character is hand-designed at all three sizes — but still needs a polish pass
 
 [FastLED]: https://github.com/FastLED/FastLED
 [SparkFun_ICM-20948]: https://github.com/sparkfun/SparkFun_ICM-20948_ArduinoLibrary
