@@ -5413,17 +5413,23 @@ class Hourglass : public Pattern { // @thumbnail("#FFDC8C", "#FFB414", "#40FFB4"
   vector32 smoothAcc;
   float motionEnergy = 0;
 
-  // one shared slow-drifting ambient field -- the sky outside the glass, the
-  // frosted interior, and the glow halo all sample the same hue/brightness
-  // functions (at different scales) so the whole scene reads as one
-  // continuous moodily-lit space rather than separately-tuned regions
-  uint8_t ambientHueAt(float x, float y, unsigned long nowMs) {
-    float ang = atan2f(y, x);
-    return 150 + (uint8_t)(18.0f * sinf(ang * 2.0f + nowMs / 5000.0f));
+  // one shared light-blue tiled field -- the sky outside the glass and the
+  // (much darker) interior both sample the same tile+gradient functions, so
+  // the whole scene reads as one continuous space rather than separately-
+  // tuned regions. The "tile" is a classic hex-grid 3-coloring on (q-r)%3 --
+  // guaranteed no two adjacent cells land in the same group -- giving a real
+  // mosaic texture instead of a flat wash; a slow radial gradient rides on
+  // top of that for depth and a bit of life.
+  uint8_t ambientHueAt(int q, int r) {
+    int tile = ((q - r) % 3 + 3) % 3;
+    return 160 + tile * 4; // light blue, tile groups a few hue-steps apart
   }
-  uint8_t ambientBriAt(float x, float y, unsigned long nowMs) {
+  uint8_t ambientBriAt(float x, float y, int q, int r, unsigned long nowMs) {
+    int tile = ((q - r) % 3 + 3) % 3;
+    uint8_t tileShade = 20 + tile * 18; // 3 distinct brightness tiers
     float dist = sqrtf(x * x + y * y) / 9.0f;
-    return 4 + (uint8_t)(7.0f * (0.5f + 0.5f * sinf(dist * 3.0f - nowMs / 4000.0f)));
+    float gradient = 0.5f + 0.5f * sinf(dist * 2.0f - nowMs / 6000.0f);
+    return tileShade + (uint8_t)(30.0f * gradient);
   }
 
   float chamberHalfWidthAt(float yy) {
@@ -5554,13 +5560,21 @@ public:
     float surfaceB = pileAtFarB ? -kChamberHeight * (1 - fB) : -fB * kChamberHeight;
     float slant = tiltX * 0.6f;
 
-    // "up" direction in display-rect space is just the opposite of gravity's
+    // "up" direction in display-rect space is the opposite of gravity's
     // in-plane component (same (ax,ay) convention AnalogClock/SolarSystem/
-    // RickRoll rely on) -- both the glow and the rim sample how aligned their
-    // own position is with that direction, so the bright side of each always
-    // faces up in the real world and visibly slides as the hexa tilts
-    float upX = -tiltX, upY = -tiltY;
+    // RickRoll rely on), rotated a fixed 25 degrees off true "up" -- both the
+    // glow and the rim sample how aligned their own position is with that
+    // axis, so the bright side of each slides as the hexa tilts, off-center
+    // rather than perfectly top-dead-center. Falloff is exponential (a power
+    // curve, not a linear ramp), same technique a specular highlight uses --
+    // a tighter, brighter hot spot with a longer dim tail, instead of a flat
+    // gradient band.
+    const float kShimmerAxisOffset = 25.0f * (float)M_PI / 180.0f;
+    float rawUpX = -tiltX, rawUpY = -tiltY;
+    float upX = rawUpX * cosf(kShimmerAxisOffset) - rawUpY * sinf(kShimmerAxisOffset);
+    float upY = rawUpX * sinf(kShimmerAxisOffset) + rawUpY * cosf(kShimmerAxisOffset);
     const float kGradientRadius = 7.5f;
+    const float kGradientExponent = 2.2f;
 
     // soft glow bleeding off the rim, drawn first so sand (below) can cover
     // it where the two overlap -- brightness is an up-facing gradient, plus
@@ -5568,18 +5582,21 @@ public:
     for (PixelIndex px : haloPixels) {
       vectorf r = axial.rectFromPixelIndex(px);
       float upAlign = constrain((r.x * upX + r.y * upY) / kGradientRadius, -1.0f, 1.0f);
-      uint8_t v = (uint8_t)(12 + 55 * (0.5f + 0.5f * upAlign));
+      float lit = powf(0.5f + 0.5f * upAlign, kGradientExponent);
+      uint8_t v = (uint8_t)(12 + 55 * lit);
       v = qadd8(v, (uint8_t)(motionEnergy * 30));
       ctx.leds[px] = CHSV(150, 75, v);
     }
 
-    // one shared ambient field for the whole scene (see ambientHueAt/BriAt).
-    // Empty chamber space and the sky both leave halo pixels alone (so the
-    // glow drawn above stays visible there) -- only actual sand is allowed
-    // to draw over the glow, so the fill always reads as filling the whole
-    // glass rather than stopping short at a visible glow ring near the rim.
+    // one shared tiled ambient field for the whole scene (see
+    // ambientHueAt/BriAt). Empty chamber space and the sky both leave halo
+    // pixels alone (so the glow drawn above stays visible there) -- only
+    // actual sand is allowed to draw over the glow, so the fill always reads
+    // as filling the whole glass rather than stopping short at a visible
+    // glow ring near the rim.
     for (PixelIndex px = 0; px < LED_COUNT; ++px) {
       vectorf r = axial.rectFromPixelIndex(px);
+      Axial ax = axial.axialFromPixelIndex(px);
       if (insideChamber(r.x, r.y)) {
         bool topChamber = r.y >= 0;
         float slantedY = r.y - slant * (r.x / kBaseHalfWidth);
@@ -5592,12 +5609,16 @@ public:
           uint8_t v = 180 + sparkle / 14;
           ctx.leds[px] = CHSV(28 + hueJitter, 235, v);
         } else if (!isHaloPixel[px]) {
-          ctx.leds[px] = CRGB::Black; // empty chamber space -- no interior glow, just the sand and the rim
+          // empty chamber space -- same tiled sky, much darker, reads as
+          // "inside the glass, in shadow" rather than a dead black void
+          uint8_t hue = ambientHueAt(ax.q(), ax.r());
+          uint8_t bri = ambientBriAt(r.x, r.y, ax.q(), ax.r(), nowMs) / 5;
+          ctx.leds[px] = CHSV(hue, 150, bri);
         }
       } else if (!isHaloPixel[px]) {
-        uint8_t bgHue = ambientHueAt(r.x, r.y, nowMs);
-        uint8_t bgBri = ambientBriAt(r.x, r.y, nowMs);
-        ctx.leds[px] = CHSV(bgHue, 205, bgBri);
+        uint8_t bgHue = ambientHueAt(ax.q(), ax.r());
+        uint8_t bgBri = ambientBriAt(r.x, r.y, ax.q(), ax.r(), nowMs);
+        ctx.leds[px] = CHSV(bgHue, 150, bgBri);
       }
     }
 
@@ -5617,7 +5638,8 @@ public:
       PixelIndex px = glassPixels[i];
       vectorf r = axial.rectFromPixelIndex(px);
       float upAlign = constrain((r.x * upX + r.y * upY) / kGradientRadius, -1.0f, 1.0f);
-      uint8_t v = (uint8_t)(150 + 105 * (0.5f + 0.5f * upAlign));
+      float lit = powf(0.5f + 0.5f * upAlign, kGradientExponent);
+      uint8_t v = (uint8_t)(150 + 105 * lit);
       v = qadd8(v, (uint8_t)(motionEnergy * 20));
       ctx.leds[px] = CHSV(150, 45, v);
     }
