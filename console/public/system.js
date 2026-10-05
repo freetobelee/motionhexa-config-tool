@@ -117,7 +117,7 @@ function renderEnum(container, tunable) {
 }
 
 function loadAll() {
-  return fetch("/api/config").then(function (r) { return r.json(); }).then(function (result) {
+  return window.fetchJson("/api/config").then(function (result) {
     state.tunables = result.tunables;
     state.textTunables = result.textTunables;
     state.enumTunables = result.enumTunables;
@@ -149,10 +149,8 @@ document.getElementById("saveBtn").addEventListener("click", function () {
     textUpdates: state.textTunables.map(function (t) { return { id: t.id, value: t.value }; }),
     enumUpdates: state.enumTunables.map(function (t) { return { id: t.id, value: t.value }; }),
   };
-  fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      if (j.error) throw new Error(j.error);
+  window.fetchJson("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+    .then(function () {
       setDirty(false);
       window.toast("Saved to disk. Build or Deploy to apply.", "ok");
     }).catch(function (e) { window.toast("Save failed: " + e.message, "err"); });
