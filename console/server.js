@@ -265,6 +265,31 @@ function writeGlyphs(font, elements) {
     if (changed) replaceOrQueueInsert(name, line, newInserts.elements);
   });
 
+  // Elements the library no longer has get their declaration removed, so the trash button in the
+  // Forge actually sticks instead of the element reappearing on the next load. Font glyphs are
+  // deliberately not handled here: the charset is fixed and each kFont_* is reached through a
+  // generated lookup, so there is nothing to delete. An element still named by pattern code is
+  // refused rather than removed, since dropping it would stop the firmware compiling.
+  if (elements && typeof elements === "object") {
+    const keep = {};
+    Object.keys(elements).forEach(function (name0) { keep["kElement_" + sanitizeIdent(name0)] = true; });
+    const toRemove = Object.keys(existingElements).filter(function (name) { return !keep[name]; });
+
+    // the declaration itself is the one expected mention of the name
+    const inUse = toRemove.filter(function (name) {
+      return (text.match(new RegExp("\\b" + name + "\\b", "g")) || []).length > 1;
+    });
+    if (inUse.length) {
+      throw new Error("Can't delete " + inUse.map(function (n) { return identToDisplay(n.replace(/^kElement_/, "")); }).join(", ") +
+        ": still drawn by pattern code in patterns.h. Remove the code that uses it first.");
+    }
+
+    toRemove.forEach(function (name) {
+      const declRe = new RegExp("^[ \\t]*const\\s+uint8_t\\s+" + name + "\\s*\\[\\s*\\d+\\s*\\]\\s*=\\s*\\{[^}]*\\};[^\\n]*\\n?", "m");
+      text = text.replace(declRe, "");
+    });
+  }
+
   // insert brand-new glyphs/elements right after the last existing declaration of the same kind
   function insertAfterLast(matchRe, lines) {
     if (!lines.length) return;
