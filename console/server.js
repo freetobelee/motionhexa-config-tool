@@ -327,6 +327,13 @@ function writeTunable(id, value) {
   const m = line.match(TUNABLE_RE);
   if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable pattern -- refusing to write (did the file change?).");
 
+  // the range in the tag is the contract; the UI clamps to it, but a stale tab or a direct
+  // POST shouldn't be able to put a value the pattern was never written to handle into the source
+  const min = Number(m[3]), max = Number(m[4]);
+  if (value < min || value > max) {
+    throw new Error("Value " + value + " for \"" + m[2] + "\" is outside the range declared by its @tunable tag (" + min + " to " + max + ").");
+  }
+
   const newLine = line.replace(/=\s*-?\d+(?:\.\d+)?\s*;/, "= " + value + ";");
   lines[idx] = newLine;
   fs.writeFileSync(filePath, lines.join(eol), "utf8");
@@ -427,6 +434,11 @@ function writeEnumTunable(id, value) {
   const m = line.match(TUNABLE_ENUM_RE);
   if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable_enum pattern -- refusing to write (did the file change?).");
 
+  const optionCount = (m[3].match(/"[^"]*"/g) || []).length;
+  if (value >= optionCount) {
+    throw new Error("Option index " + value + " for \"" + m[2] + "\" is out of range -- its @tunable_enum tag declares " + optionCount + " option(s).");
+  }
+
   const newLine = line.replace(/=\s*-?\d+\s*;/, "= " + value + ";");
   lines[idx] = newLine;
   fs.writeFileSync(filePath, lines.join(eol), "utf8");
@@ -493,10 +505,21 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+const MAX_BODY_BYTES = 8 * 1024 * 1024; // the glyph library is the biggest real payload and is far under this
+
 function readBody(req) {
   return new Promise(function (resolve, reject) {
     let chunks = [];
-    req.on("data", function (c) { chunks.push(c); });
+    let total = 0;
+    req.on("data", function (c) {
+      total += c.length;
+      if (total > MAX_BODY_BYTES) {
+        reject(new Error("Request body too large (over " + (MAX_BODY_BYTES / 1024 / 1024) + "MB)."));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", function () {
       try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {}); }
       catch (e) { reject(new Error("Invalid JSON body: " + e.message)); }
@@ -560,9 +583,20 @@ const server = http.createServer(function (req, res) {
       return runPio(["run", "-e", PIO_ENV, "-t", "upload"], res);
     }
 
-    // static file serving for the UI
-    let filePath = url.pathname === "/" ? "/index.html" : url.pathname;
-    filePath = path.join(__dirname, "public", path.normalize(filePath).replace(/^(\.\.[\/\\])+/, ""));
+    // static file serving for the UI, confined to public/ -- normalize() on an absolute path
+    // already collapses "..", but resolve the result and check it explicitly rather than
+    // relying on that, since everything else here writes to real project files
+    const publicRoot = path.resolve(__dirname, "public");
+    let requested;
+    try {
+      requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+    } catch (e) {
+      res.writeHead(404); res.end("Not found"); return; // malformed percent-encoding names no file
+    }
+    const filePath = path.resolve(publicRoot, "." + path.posix.normalize(requested));
+    if (filePath !== publicRoot && !filePath.startsWith(publicRoot + path.sep)) {
+      res.writeHead(403); res.end("Forbidden"); return;
+    }
     fs.readFile(filePath, function (err, data) {
       if (err) { res.writeHead(404); res.end("Not found"); return; }
       const ext = path.extname(filePath);
@@ -575,8 +609,14 @@ const server = http.createServer(function (req, res) {
 });
 
 if (require.main === module) {
-  server.listen(PORT, function () {
+  // loopback only: these endpoints rewrite project source and can run `pio run -t upload` to
+  // flash an attached device, with no authentication. Set HOST=0.0.0.0 to expose it deliberately.
+  const HOST = process.env.HOST || "127.0.0.1";
+  server.listen(PORT, HOST, function () {
     console.log("Motionhexa console running at http://localhost:" + PORT);
+    if (HOST !== "127.0.0.1" && HOST !== "localhost") {
+      console.log("WARNING: listening on " + HOST + " -- this server has no auth and can write source and flash hardware.");
+    }
     console.log("Project root: " + PROJECT_ROOT);
   });
 }
