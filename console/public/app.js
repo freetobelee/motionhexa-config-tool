@@ -241,7 +241,10 @@ document.getElementById("reloadBtn").addEventListener("click", function () {
 });
 
 document.getElementById("saveBtn").addEventListener("click", function () {
-  var patternsPayload = { patterns: state.patterns.map(function (p) { return { name: p.name, enabled: p.enabled }; }) };
+  // save the order as shown, not the underlying array order: disabled programs sink to the
+  // bottom of the list visually, and writing the un-sunk order would register them somewhere
+  // the user never put them
+  var patternsPayload = { patterns: displayOrder().map(function (p) { return { name: p.name, enabled: p.enabled }; }) };
   var configPayload = { updates: state.tunables.map(function (t) { return { id: t.id, value: t.value }; }) };
 
   Promise.all([

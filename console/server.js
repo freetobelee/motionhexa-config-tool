@@ -29,27 +29,36 @@ const TUNABLE_FILES = [
 
 /* ---------------- pattern registration block (main.cpp) ---------------- */
 
-const BLOCK_START_RE = /patternManager\.registerPattern<MotionHexa>\(\);/;
 const BLOCK_END_RE = /^\s*#if HARDWARE_VERSION >= 3\s*$/;
 const ACTIVE_LINE_RE = /^\s*patternManager\.registerPattern<(\w+)>\(\);\s*$/;
 const DISABLED_LINE_RE = /^\s*\/\/\s*(\w+)\s*\(see patterns\.h\)\s*is left defined but unregistered for now\.\s*$/;
 
-function findPatternBlock(lines) {
-  let startIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (BLOCK_START_RE.test(lines[i])) { startIdx = i; break; }
-  }
-  if (startIdx === -1) throw new Error("Could not find the pattern registration block (MotionHexa marker) in main.cpp -- has the file structure changed?");
+function isPatternLine(line) {
+  return ACTIVE_LINE_RE.test(line) || DISABLED_LINE_RE.test(line);
+}
 
+// The block is bounded by structure, not by any one pattern's position: anchor on the
+// `#if HARDWARE_VERSION >= 3` marker that follows it and walk back over the run of
+// registration/disabled lines. Anchoring the start on a specific pattern instead (it used
+// to be MotionHexa's line) silently drops every pattern above it out of the managed range
+// the moment the user drags something past it.
+function findPatternBlock(lines) {
   let endMarkerIdx = -1;
-  for (let i = startIdx; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     if (BLOCK_END_RE.test(lines[i])) { endMarkerIdx = i; break; }
   }
   if (endMarkerIdx === -1) throw new Error("Could not find the '#if HARDWARE_VERSION >= 3' end marker after the pattern block in main.cpp.");
 
   // last non-blank line before the end marker is the last pattern line
   let endIdx = endMarkerIdx - 1;
-  while (endIdx > startIdx && lines[endIdx].trim() === "") endIdx--;
+  while (endIdx >= 0 && lines[endIdx].trim() === "") endIdx--;
+  if (endIdx < 0 || !isPatternLine(lines[endIdx])) {
+    throw new Error("Expected the pattern registration block to end just above '#if HARDWARE_VERSION >= 3' in main.cpp, but found " +
+      JSON.stringify(endIdx < 0 ? "" : lines[endIdx]) + " -- refusing to touch main.cpp until this is understood.");
+  }
+
+  let startIdx = endIdx;
+  while (startIdx > 0 && isPatternLine(lines[startIdx - 1])) startIdx--;
 
   return { startIdx, endIdx };
 }
