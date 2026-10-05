@@ -776,12 +776,28 @@ public:
 };
 
 
+// Framerate-invariant wrapped output motion integrator
+struct MotionIntegrator {
+  const int32_t scale, period, baselineFPS;
+  int32_t value = 0; // [0, period)
+  int32_t carry = 0; // sub-unit remainder in 1/(1000*scale) units, [0, 1000*scale)
+  MotionIntegrator(int32_t scale, int32_t period, int32_t baselineFPS) : scale(scale), period(max(period, 1)), baselineFPS(baselineFPS) {}
+  void step(int32_t sample, int32_t frameMS) {
+    // frameMS*baselineFPS/1000 baseline frames elapsed, sample/scale per baseline frame. |sample| <= 32767, frameMS <= 100: fits int32.
+    const int32_t unit = 1000 * scale;
+    carry += sample * frameMS * baselineFPS;
+    int32_t whole = carry / unit;
+    if (carry < 0 && carry % unit != 0) --whole; // floor, so carry stays non-negative
+    carry -= whole * unit;
+    value = mod_wrap(value + whole, period);
+  }
+};
+
 /* Concept
   PulseHexa except each shell is a looped palette which rotates as you rotate the hexagon.
   Hexa zooms in and out with motion along z axis?
   in any case add parameters and link them to motion
 */
-// FIXME: this has a continuity issue where the animation jumps across some probably modulus overflow OH or in the accAccum??
 class MotionHexa : public Pattern, PaletteRotation<CRGBPalette256> { // @thumbnail("#780000", "#FF6800", "#1000A2")
 public:
   HexaShells hexaShells;
@@ -790,71 +806,95 @@ public:
     maxColorJump = 30;
   }
 
-  vector32 gyrAccum32;
-  vector32 accAccum32;
+  // tuned against the fixed sensor scales MotionManager configures (8192 LSB/g, 16.4 LSB/dps),
+  // which is what the DMP path reads; the pre-DMP raw path used coarser divisors
+  static constexpr int32_t kBaselineFPS = 90;
+  static constexpr int32_t accScale = 1000;
+  static constexpr int32_t gyrScale = 200;
+
+  // One integrator per motion term, each wrapped at a common multiple of the moduli update()
+  // derives from it, so the animation is continuous across the wrap instead of jumping:
+  //   gyr.x: bandIndex = 2x walks 6 bands of 4096 (period 12288 in x) and phases a beatsin16 (65536)
+  //   gyr.y: s*y/8 mod 0x200         gyr.z: z/2 mod 0x200         acc.x: x/4 mod 256
+  //   acc.y: bands*y/shellSize mod 256 for every shell size, so 256 * lcm(shell sizes)
+  MotionIntegrator gyrX{gyrScale, 3 * 65536, kBaselineFPS};
+  MotionIntegrator gyrY{gyrScale, 8 * 0x200, kBaselineFPS};
+  MotionIntegrator gyrZ{gyrScale, 2 * 0x200, kBaselineFPS};
+  MotionIntegrator accX{accScale, 4 * 256, kBaselineFPS};
+  MotionIntegrator accY{accScale, twistPeriod(hexaShells), kBaselineFPS};
+
+  static int32_t twistPeriod(const HexaShells &shells) {
+    int64_t l = 1;
+    for (auto &shell : shells.shells) {
+      int64_t n = shell.size(), a = l, b = n;
+      if (n == 0) continue;
+      while (b) { int64_t t = a % b; a = b; b = t; }
+      l = l / a * n;
+    }
+    return (int32_t)min<int64_t>(256 * l, INT32_MAX / 2); // 3870720 for the 10-shell hexa
+  }
 
   void update() {
-    const int accScale = (MotionManager::manager().enableDMP ? 1000 : 2000); // coolcool cool coooool
-    const int gyrScale = (MotionManager::manager().enableDMP ? 200 : 2000); // coolcoolcool
     ICM_20948_AGMT_t agmt = MotionManager::motionFrame.agmt;
-    gyrAccum32 += vector16(agmt.gyr.axes.x, agmt.gyr.axes.y, agmt.gyr.axes.z);
-    accAccum32 += vector16(agmt.acc.axes.x, agmt.acc.axes.y, agmt.acc.axes.z);
-    vector32 gyrAccum = gyrAccum32 / gyrScale;
-    vector32 accAccum = accAccum32 / accScale;
-    // logf("gyr = (%i, %i, %i), gyrAccum = (%i, %i, %i), accel = (%i, %i, %i), accelAccum = (%i, %i, %i)", 
-    //         agmt.gyr.axes.x/gyrScale, agmt.gyr.axes.y/gyrScale, agmt.gyr.axes.z/gyrScale,
-    //         gyrAccum.x, gyrAccum.y, gyrAccum.z,
-    //         agmt.acc.axes.x/accScale, agmt.acc.axes.y/accScale, agmt.acc.axes.z/accScale,
-    //         accAccum.x, accAccum.y, accAccum.z);
-    
-    int index = 0;
+    // clamp long stalls to not jump the animation
+    int32_t frameMS = constrain((int32_t)frameTime(), 0, 100);
+    gyrX.step(agmt.gyr.axes.x, frameMS);
+    gyrY.step(agmt.gyr.axes.y, frameMS);
+    gyrZ.step(agmt.gyr.axes.z, frameMS);
+    accX.step(agmt.acc.axes.x, frameMS);
+    accY.step(agmt.acc.axes.y, frameMS);
+
     int shellCount = hexaShells.shells.size();
-    for (int s = 0 ; s < hexaShells.shells.size(); ++s) {
-      uint8_t shellSize = hexaShells.shells[s].size();
-      
-      const int32_t bandIndex = gyrAccum.x*2; // TODO: tune this so it's roughly one half index change every complete flip
-      const int32_t bandRotate = accAccum.x;
-      const int32_t bandTwist = accAccum.y;//gyrAccum.z*2;
-      const int32_t bandThing = 0;//accAccum.x;
-      const int bandCounts[] = {0, 1, 2, 3, 6, 9}; // i like this somewhat better than arbitrary band counts
-      int32_t bands = bandCounts[((int32_t)(bandIndex+INT16_MAX) / (1<<12)) % ARRAY_SIZE(bandCounts)];
-      int32_t withinBand = (int32_t)(bandIndex+INT16_MAX-(1<<11)) % (1<<12);
-      uint8_t bandFadeIn = 0xFF - cos8(0xFF*withinBand / (1<<12));
-      
+
+    // frame-constant terms
+    const unsigned long mils = millis();
+    const unsigned long rt = runTime();
+    CRGBPalette256 &palette = getPalette(); // also advances palette rotation once per frame instead of per pixel
+
+    const int32_t bandIndex = gyrX.value * 2 + INT16_MAX; // TODO: tune this so it's roughly one half index change every complete flip
+    const int32_t bandRotate = accX.value;
+    const int32_t bandTwist = accY.period - accY.value; // negated within the period, so the division below stays on positive values
+    const int bandCounts[] = {0, 1, 2, 3, 6, 9}; // i like this somewhat better than arbitrary band counts
+    int32_t bands = bandCounts[(bandIndex / (1<<12)) % ARRAY_SIZE(bandCounts)];
+    int32_t withinBand = (bandIndex - (1<<11)) % (1<<12);
+    uint8_t bandFadeIn = 0xFF - cos8(0xFF*withinBand / (1<<12));
+
+    const int32_t gyrRotate = gyrZ.value / 2; // getMirroredPaletteColor wraps at 0x200
+    const int32_t evolve = (mils/100) % 0x200;
+    const int32_t evolveTwistMS = mils % (500 * 0x200); // wraps where s*x/500 is a multiple of 0x200, and keeps s*x in range
+    const int32_t shellHBeat = beatsin16(3, 0, 0x200, 0, gyrX.value);
+
+    for (int s = 0 ; s < shellCount; ++s) {
+      auto &shell = hexaShells.shells[s];
+      uint8_t shellSize = shell.size();
+
       // fade in at start
       const long fadeinDuration = 1000;
-      // uint8_t shellBrightness = runTime() < fadeinDuration ? max(0, min(0xFF, 0xFF * (runTime() - fadeinDuration/hexaShells.shells.size()*s)/fadeinDuration * (hexaShells.shells.size() - s) / hexaShells.shells.size())) : 0xFF;
-
       uint8_t shellBrightness = 0xFF;
-      if (runTime() < fadeinDuration) {
-        long fadeOverlap = hexaShells.shells.size()/2;
-        long shellFadeTime = fadeinDuration/(hexaShells.shells.size() + fadeOverlap);
-        shellBrightness = (runTime() > s * shellFadeTime ? min(0xFF, 0xFF * (runTime() - s*shellFadeTime) / (fadeOverlap * shellFadeTime)) : 0);
+      if (rt < fadeinDuration) {
+        long fadeOverlap = shellCount/2;
+        long shellFadeTime = fadeinDuration/(shellCount + fadeOverlap);
+        shellBrightness = (rt > s * shellFadeTime ? min(0xFF, 0xFF * (rt - s*shellFadeTime) / (fadeOverlap * shellFadeTime)) : 0);
       }
 
-      for (int si = 0; si < hexaShells.shells[s].size(); ++si) {
-        auto pxOpt = hexaShells.shells[s][si];
+      int32_t twistFactor = (s * gyrY.value / 8 + s * evolveTwistMS / 500) % 0x200;
+      int32_t shellH = 0x200 * s/shellCount * shellHBeat / 0x200;
+
+      for (int si = 0; si < shellSize; ++si) {
+        auto pxOpt = shell[si];
         if (!pxOpt.has_value()) continue;
         PixelIndex px = pxOpt.value();
 
-        uint8_t brightness = lerp8by8(sin8(-bandRotate/4 + bands*(0xFF*si - bandTwist) / shellSize - 0xFF * (s-bandThing)/shellCount), 0xFF, bandFadeIn);
+        uint8_t brightness = lerp8by8(sin8(-bandRotate/4 + bands*(0xFF*si + bandTwist) / shellSize - 0xFF*s/shellCount), 0xFF, bandFadeIn);
 
         brightness = scale8(brightness, brightness);
-        int32_t gyrRotate = (gyrAccum.z/2) % 0x200;
         int32_t radialH =  0x200 * si / shellSize;
-        int32_t twistFactor = (s * gyrAccum.y/8 + s * millis()/500) % 0x200;
-        int32_t shellH = 0x200 * s/shellCount * beatsin16(3, 0, 0x200, 0, gyrAccum.x) / 0x200;
-        int32_t evolve = (millis()/100)%0x200;
-        CRGB c = this->getMirroredPaletteColor(gyrRotate + radialH + twistFactor + shellH + evolve);
-        
-        // improvement: do this in certain accelerometer conditions
-        // if (si%2) {
-        //   brightness = scale8(brightness, beatsin8(10));
-        // } else {
-        //   brightness = scale8(brightness, beatsin8(10, 0, 0xFF, 0, 0x7F));
-        // }
+        CRGB c = PaletteRotation<CRGBPalette256>::getMirroredPaletteColor(palette, gyrRotate + radialH + twistFactor + shellH + evolve);
+
         c.nscale8(brightness);
-        c.nscale8(shellBrightness);
+        if (shellBrightness != 0xFF) {
+          c.nscale8(shellBrightness);
+        }
         ctx.leds[px] = c;
       }
     }
@@ -2702,6 +2742,7 @@ class TriangleSpin : public Pattern, PaletteRotation<CRGBPalette256> { // @thumb
 public:
   TriangleSpin() {
     secondsPerPalette = 20;
+    minBrightness = 10;
   };
 
   // Rotate vector v by quaternion q: v' = v + 2w*(q×v) + 2*(q×(q×v))
