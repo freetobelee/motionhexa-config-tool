@@ -815,7 +815,15 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
   }
 
-  function autoPopulate() {
+  // The font charset is fixed, so every character needs some cell array to edit even if
+  // patterns.h has no glyph for it yet -- those get seeded from a generated shape.
+  //
+  // Elements are different: they're a library the user adds to and deletes from, so they're
+  // only seeded for the pre-load local baseline (includeElements). Seeding them after the
+  // disk load would resurrect anything just deleted -- 8 of the 13 elements are in
+  // DEFAULT_ELEMENTS and could never be removed -- and would quietly replace a hand-drawn
+  // element missing from disk with a generic built-in shape, then save that back out.
+  function autoPopulate(includeElements) {
     var changed = false;
     Object.keys(SIZES).forEach(function (sk) {
       ALL_CHARS.forEach(function (ch) {
@@ -825,12 +833,14 @@
         }
       });
     });
-    Object.keys(FG.DEFAULT_ELEMENTS).forEach(function (name) {
-      if (!data.elements[name]) {
-        data.elements[name] = cellsToPairs(sampleShape(SHAPES[FG.DEFAULT_ELEMENTS[name]]));
-        changed = true;
-      }
-    });
+    if (includeElements) {
+      Object.keys(FG.DEFAULT_ELEMENTS).forEach(function (name) {
+        if (!data.elements[name]) {
+          data.elements[name] = cellsToPairs(sampleShape(SHAPES[FG.DEFAULT_ELEMENTS[name]]));
+          changed = true;
+        }
+      });
+    }
     if (changed) saveStorage();
   }
 
@@ -1263,7 +1273,7 @@
   /* ---------------- direct-to-disk save (patterns.h via the console server) ---------------- */
 
   function loadFromServer() {
-    return fetch("/api/glyphs").then(function (r) { return r.json(); }).then(function (result) {
+    return window.fetchJson("/api/glyphs").then(function (result) {
       data.font = result.font;
       data.elements = result.elements;
       A.saveStorage();
@@ -1276,12 +1286,11 @@
     window.__hexaForgeUI.commitCurrent();
     var btn = document.getElementById("saveToDeviceBtn");
     if (btn) btn.disabled = true;
-    return fetch("/api/glyphs", {
+    return window.fetchJson("/api/glyphs", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ font: data.font, elements: data.elements }),
-    }).then(function (r) { return r.json(); }).then(function (j) {
+    }).then(function () {
       if (btn) btn.disabled = false;
-      if (j.error) throw new Error(j.error);
       var diskDot = document.getElementById("diskDirtyDot");
       if (diskDot) diskDot.classList.remove("show");
       window.__hexaForgeUI.flash(window.__hexaForgeUI.statusLine, "Saved to patterns.h.", "ok");
@@ -1309,7 +1318,7 @@
   // flight) -- the server load right after overwrites this with the real,
   // on-disk state, which is always the source of truth
   A.loadStorage();
-  A.autoPopulate();
+  A.autoPopulate(true);
   window.__hexaForgeUI.renderCharGrid();
   window.__hexaForgeUI.renderLibrary();
   window.__hexaForgeUI.updateCharGridHighlight();
@@ -1323,7 +1332,9 @@
   loadFromServer().then(function () {
     var libTag = document.getElementById("libVersionTag");
     if (libTag) libTag.textContent = "v" + (data.libVersion || 0);
-    A.autoPopulate();
+    A.autoPopulate(false); // disk is the source of truth for the element library
+    // the selected element may be gone from disk; editing a dangling selection would re-create it
+    if (A.state.elementName && !data.elements[A.state.elementName]) A.state.elementName = null;
     window.__hexaForgeUI.renderLibrary();
     if (A.state.mode === "elements") {
       A.loadCellsIntoCanvas(A.state.elementName ? data.elements[A.state.elementName] : []);

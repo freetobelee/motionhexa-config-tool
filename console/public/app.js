@@ -223,8 +223,8 @@ function reorderByName(srcName, targetName) {
 
 function loadAll() {
   return Promise.all([
-    fetch("/api/patterns").then(function (r) { return r.json(); }),
-    fetch("/api/config").then(function (r) { return r.json(); }),
+    window.fetchJson("/api/patterns"),
+    window.fetchJson("/api/config"),
   ]).then(function (results) {
     state.patterns = results[0].patterns;
     state.thumbnails = results[0].thumbnails || {};
@@ -241,15 +241,22 @@ document.getElementById("reloadBtn").addEventListener("click", function () {
 });
 
 document.getElementById("saveBtn").addEventListener("click", function () {
-  var patternsPayload = { patterns: state.patterns.map(function (p) { return { name: p.name, enabled: p.enabled }; }) };
+  // save the order as shown, not the underlying array order: disabled programs sink to the
+  // bottom of the list visually, and writing the un-sunk order would register them somewhere
+  // the user never put them
+  var patternsPayload = { patterns: displayOrder().map(function (p) { return { name: p.name, enabled: p.enabled }; }) };
   var configPayload = { updates: state.tunables.map(function (t) { return { id: t.id, value: t.value }; }) };
+  var post = function (url, body) {
+    return window.fetchJson(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  };
 
-  Promise.all([
-    fetch("/api/patterns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patternsPayload) })
-      .then(function (r) { return r.json(); }).then(function (j) { if (j.error) throw new Error(j.error); }),
-    fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(configPayload) })
-      .then(function (r) { return r.json(); }).then(function (j) { if (j.error) throw new Error(j.error); }),
-  ]).then(function () {
+  // sequential, not parallel: these write different files, and if the rotation can't be
+  // written there's no reason to have already applied the settings alongside it
+  post("/api/patterns", patternsPayload).then(function () {
+    return post("/api/config", configPayload).catch(function (e) {
+      throw new Error("program rotation saved, but settings failed: " + e.message);
+    });
+  }).then(function () {
     setDirty(false);
     window.toast("Saved to disk. Build or Deploy to apply.", "ok");
   }).catch(function (e) { window.toast("Save failed: " + e.message, "err"); });

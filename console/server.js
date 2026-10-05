@@ -29,27 +29,36 @@ const TUNABLE_FILES = [
 
 /* ---------------- pattern registration block (main.cpp) ---------------- */
 
-const BLOCK_START_RE = /patternManager\.registerPattern<MotionHexa>\(\);/;
 const BLOCK_END_RE = /^\s*#if HARDWARE_VERSION >= 3\s*$/;
 const ACTIVE_LINE_RE = /^\s*patternManager\.registerPattern<(\w+)>\(\);\s*$/;
 const DISABLED_LINE_RE = /^\s*\/\/\s*(\w+)\s*\(see patterns\.h\)\s*is left defined but unregistered for now\.\s*$/;
 
-function findPatternBlock(lines) {
-  let startIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (BLOCK_START_RE.test(lines[i])) { startIdx = i; break; }
-  }
-  if (startIdx === -1) throw new Error("Could not find the pattern registration block (MotionHexa marker) in main.cpp -- has the file structure changed?");
+function isPatternLine(line) {
+  return ACTIVE_LINE_RE.test(line) || DISABLED_LINE_RE.test(line);
+}
 
+// The block is bounded by structure, not by any one pattern's position: anchor on the
+// `#if HARDWARE_VERSION >= 3` marker that follows it and walk back over the run of
+// registration/disabled lines. Anchoring the start on a specific pattern instead (it used
+// to be MotionHexa's line) silently drops every pattern above it out of the managed range
+// the moment the user drags something past it.
+function findPatternBlock(lines) {
   let endMarkerIdx = -1;
-  for (let i = startIdx; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     if (BLOCK_END_RE.test(lines[i])) { endMarkerIdx = i; break; }
   }
   if (endMarkerIdx === -1) throw new Error("Could not find the '#if HARDWARE_VERSION >= 3' end marker after the pattern block in main.cpp.");
 
   // last non-blank line before the end marker is the last pattern line
   let endIdx = endMarkerIdx - 1;
-  while (endIdx > startIdx && lines[endIdx].trim() === "") endIdx--;
+  while (endIdx >= 0 && lines[endIdx].trim() === "") endIdx--;
+  if (endIdx < 0 || !isPatternLine(lines[endIdx])) {
+    throw new Error("Expected the pattern registration block to end just above '#if HARDWARE_VERSION >= 3' in main.cpp, but found " +
+      JSON.stringify(endIdx < 0 ? "" : lines[endIdx]) + " -- refusing to touch main.cpp until this is understood.");
+  }
+
+  let startIdx = endIdx;
+  while (startIdx > 0 && isPatternLine(lines[startIdx - 1])) startIdx--;
 
   return { startIdx, endIdx };
 }
@@ -256,6 +265,31 @@ function writeGlyphs(font, elements) {
     if (changed) replaceOrQueueInsert(name, line, newInserts.elements);
   });
 
+  // Elements the library no longer has get their declaration removed, so the trash button in the
+  // Forge actually sticks instead of the element reappearing on the next load. Font glyphs are
+  // deliberately not handled here: the charset is fixed and each kFont_* is reached through a
+  // generated lookup, so there is nothing to delete. An element still named by pattern code is
+  // refused rather than removed, since dropping it would stop the firmware compiling.
+  if (elements && typeof elements === "object") {
+    const keep = {};
+    Object.keys(elements).forEach(function (name0) { keep["kElement_" + sanitizeIdent(name0)] = true; });
+    const toRemove = Object.keys(existingElements).filter(function (name) { return !keep[name]; });
+
+    // the declaration itself is the one expected mention of the name
+    const inUse = toRemove.filter(function (name) {
+      return (text.match(new RegExp("\\b" + name + "\\b", "g")) || []).length > 1;
+    });
+    if (inUse.length) {
+      throw new Error("Can't delete " + inUse.map(function (n) { return identToDisplay(n.replace(/^kElement_/, "")); }).join(", ") +
+        ": still drawn by pattern code in patterns.h. Remove the code that uses it first.");
+    }
+
+    toRemove.forEach(function (name) {
+      const declRe = new RegExp("^[ \\t]*const\\s+uint8_t\\s+" + name + "\\s*\\[\\s*\\d+\\s*\\]\\s*=\\s*\\{[^}]*\\};[^\\n]*\\n?", "m");
+      text = text.replace(declRe, "");
+    });
+  }
+
   // insert brand-new glyphs/elements right after the last existing declaration of the same kind
   function insertAfterLast(matchRe, lines) {
     if (!lines.length) return;
@@ -317,6 +351,13 @@ function writeTunable(id, value) {
   const line = lines[idx];
   const m = line.match(TUNABLE_RE);
   if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable pattern -- refusing to write (did the file change?).");
+
+  // the range in the tag is the contract; the UI clamps to it, but a stale tab or a direct
+  // POST shouldn't be able to put a value the pattern was never written to handle into the source
+  const min = Number(m[3]), max = Number(m[4]);
+  if (value < min || value > max) {
+    throw new Error("Value " + value + " for \"" + m[2] + "\" is outside the range declared by its @tunable tag (" + min + " to " + max + ").");
+  }
 
   const newLine = line.replace(/=\s*-?\d+(?:\.\d+)?\s*;/, "= " + value + ";");
   lines[idx] = newLine;
@@ -418,6 +459,11 @@ function writeEnumTunable(id, value) {
   const m = line.match(TUNABLE_ENUM_RE);
   if (!m) throw new Error("Line " + lineNum + " in " + relFile + " no longer matches the expected @tunable_enum pattern -- refusing to write (did the file change?).");
 
+  const optionCount = (m[3].match(/"[^"]*"/g) || []).length;
+  if (value >= optionCount) {
+    throw new Error("Option index " + value + " for \"" + m[2] + "\" is out of range -- its @tunable_enum tag declares " + optionCount + " option(s).");
+  }
+
   const newLine = line.replace(/=\s*-?\d+\s*;/, "= " + value + ";");
   lines[idx] = newLine;
   fs.writeFileSync(filePath, lines.join(eol), "utf8");
@@ -484,10 +530,21 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+const MAX_BODY_BYTES = 8 * 1024 * 1024; // the glyph library is the biggest real payload and is far under this
+
 function readBody(req) {
   return new Promise(function (resolve, reject) {
     let chunks = [];
-    req.on("data", function (c) { chunks.push(c); });
+    let total = 0;
+    req.on("data", function (c) {
+      total += c.length;
+      if (total > MAX_BODY_BYTES) {
+        reject(new Error("Request body too large (over " + (MAX_BODY_BYTES / 1024 / 1024) + "MB)."));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", function () {
       try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {}); }
       catch (e) { reject(new Error("Invalid JSON body: " + e.message)); }
@@ -551,9 +608,20 @@ const server = http.createServer(function (req, res) {
       return runPio(["run", "-e", PIO_ENV, "-t", "upload"], res);
     }
 
-    // static file serving for the UI
-    let filePath = url.pathname === "/" ? "/index.html" : url.pathname;
-    filePath = path.join(__dirname, "public", path.normalize(filePath).replace(/^(\.\.[\/\\])+/, ""));
+    // static file serving for the UI, confined to public/ -- normalize() on an absolute path
+    // already collapses "..", but resolve the result and check it explicitly rather than
+    // relying on that, since everything else here writes to real project files
+    const publicRoot = path.resolve(__dirname, "public");
+    let requested;
+    try {
+      requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+    } catch (e) {
+      res.writeHead(404); res.end("Not found"); return; // malformed percent-encoding names no file
+    }
+    const filePath = path.resolve(publicRoot, "." + path.posix.normalize(requested));
+    if (filePath !== publicRoot && !filePath.startsWith(publicRoot + path.sep)) {
+      res.writeHead(403); res.end("Forbidden"); return;
+    }
     fs.readFile(filePath, function (err, data) {
       if (err) { res.writeHead(404); res.end("Not found"); return; }
       const ext = path.extname(filePath);
@@ -566,8 +634,14 @@ const server = http.createServer(function (req, res) {
 });
 
 if (require.main === module) {
-  server.listen(PORT, function () {
+  // loopback only: these endpoints rewrite project source and can run `pio run -t upload` to
+  // flash an attached device, with no authentication. Set HOST=0.0.0.0 to expose it deliberately.
+  const HOST = process.env.HOST || "127.0.0.1";
+  server.listen(PORT, HOST, function () {
     console.log("Motionhexa console running at http://localhost:" + PORT);
+    if (HOST !== "127.0.0.1" && HOST !== "localhost") {
+      console.log("WARNING: listening on " + HOST + " -- this server has no auth and can write source and flash hardware.");
+    }
     console.log("Project root: " + PROJECT_ROOT);
   });
 }
