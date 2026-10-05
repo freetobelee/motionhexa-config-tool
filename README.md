@@ -72,7 +72,7 @@ Dependencies ([FastLED], [SparkFun_ICM-20948], [edrean/BQ27427 Battery Fuel Gaug
 Config Tool:
 - Remove the "Saved" indicator text in the Fonts & Elements tool
 - Make thumbnails real visual representations of what each program actually looks like, not just a color swatch
-- Double-check the audio sensitivity setting actually works on the droplet programs
+- Give the droplet programs an audio sensitivity setting — they don't currently have one. Only `PulseHexaSmooth` and `SoundBits` expose `@tunable("Audio Sensitivity", ...)`; SparkleDroplets and BlobDroplets just ride `SoundPattern`'s auto-gain (`minFFTLevelThreshold`, `autoGainAdjustmentInterval`), neither of which is tagged. Two things block a straight tag: both constants are brace-initialized members (`{3}`) and the scanner only matches `= value;`, and `@tunable`'s 4th argument names a single program, so one constant on a shared base class can't appear under both droplet panels
 - Add a way to define which physical face is "the bottom" per program, for the programs that need it (Clock, Solar System, Timer, Glyph Viewer)
 
 Firmware:
